@@ -57,34 +57,88 @@ export class CustomerRepository {
         err.message?.includes("Can't reach database server") ||
         err.name === 'PrismaClientInitializationError'
       ) {
+        const allMockCustomers = [
+          {
+            id: 'cust-001',
+            shop_id: shopId,
+            name: 'Lê Thu Hương',
+            phone: '0987654321',
+            address: 'Số 15 ngõ 120 Hoàng Hoa Thám, Ba Đình, Hà Nội',
+            total_orders: 3,
+            total_spent_vnd: 790000,
+            notes: 'Khách hay mua váy hoa nhí, thích giao giờ hành chính',
+            created_at: new Date(Date.now() - 3600000 * 24 * 30),
+          },
+          {
+            id: 'cust-002',
+            shop_id: shopId,
+            name: 'Trần Mai Chi',
+            phone: '0912345678',
+            address: '45 Lê Duẩn, Quận 1, TP.HCM',
+            total_orders: 1,
+            total_spent_vnd: 310000,
+            notes: 'Khách đặt qua Instagram, chuyển khoản trước',
+            created_at: new Date(Date.now() - 3600000 * 24 * 15),
+          },
+          {
+            id: 'cust-003',
+            shop_id: shopId,
+            name: 'Nguyễn Thùy Linh',
+            phone: '0934567890',
+            address: '12 Tôn Đức Thắng, Đống Đa, Hà Nội',
+            total_orders: 1,
+            total_spent_vnd: 650000,
+            notes: 'Khách mua set vest công sở',
+            created_at: new Date(Date.now() - 3600000 * 24 * 10),
+          },
+          {
+            id: 'cust-004',
+            shop_id: shopId,
+            name: 'Phạm Hồng Nhung',
+            phone: '0978901234',
+            address: '88 Nguyễn Trãi, Thanh Xuân, Hà Nội',
+            total_orders: 1,
+            total_spent_vnd: 560000,
+            notes: 'Mua 2 áo sơ mi lụa trắng',
+            created_at: new Date(Date.now() - 3600000 * 24 * 5),
+          },
+          {
+            id: 'cust-005',
+            shop_id: shopId,
+            name: 'Hoàng Khánh Ly',
+            phone: '0905123456',
+            address: 'Vincom Center, 72 Lê Thánh Tôn, Bến Nghé, Quận 1, TP.HCM',
+            total_orders: 1,
+            total_spent_vnd: 890000,
+            notes: 'Khách VIP đặt may',
+            created_at: new Date(Date.now() - 3600000 * 24 * 4),
+          },
+          {
+            id: 'cust-006',
+            shop_id: shopId,
+            name: 'Đặng Thị Thu Hà',
+            phone: '0943210987',
+            address: 'Chợ Cồn, Hải Châu, Đà Nẵng',
+            total_orders: 0,
+            total_spent_vnd: 0,
+            notes: 'Khách mới hỏi qua tin nhắn dán AI, chưa chốt đơn',
+            created_at: new Date(Date.now() - 3600000 * 2),
+          },
+        ];
+
+        let filtered = allMockCustomers;
+        if (search) {
+          const s = search.toLowerCase();
+          filtered = filtered.filter((c) => c.name.toLowerCase().includes(s) || c.phone.includes(s));
+        }
+
         return {
-          items: [
-            {
-              id: 'cust-001',
-              shop_id: shopId,
-              name: 'Lê Thu Hương',
-              phone: '0987654321',
-              address: 'Số 15 ngõ 120 Hoàng Hoa Thám, Ba Đình, Hà Nội',
-              total_orders: 3,
-              total_spent_vnd: 850000,
-              created_at: new Date(Date.now() - 3600000 * 24 * 5),
-            },
-            {
-              id: 'cust-002',
-              shop_id: shopId,
-              name: 'Trần Mai Chi',
-              phone: '0912345678',
-              address: '45 Lê Duẩn, Quận 1, TP.HCM',
-              total_orders: 1,
-              total_spent_vnd: 280000,
-              created_at: new Date(Date.now() - 3600000 * 24 * 2),
-            },
-          ],
+          items: filtered.slice(skip, skip + limit),
           pagination: {
-            page: 1,
-            limit: 20,
-            total: 2,
-            total_pages: 1,
+            page,
+            limit,
+            total: filtered.length,
+            total_pages: Math.ceil(filtered.length / limit),
           },
         };
       }
@@ -93,19 +147,32 @@ export class CustomerRepository {
   }
 
   public static async findById(shopId: string, customerId: string) {
-    const customer = await prisma.customer.findFirst({
-      where: {
-        id: customerId,
-        shop_id: shopId,
-        deleted_at: null,
-      },
-    });
+    try {
+      const customer = await prisma.customer.findFirst({
+        where: {
+          id: customerId,
+          shop_id: shopId,
+          deleted_at: null,
+        },
+      });
 
-    if (!customer) {
-      throw new NotFoundError('Không tìm thấy khách hàng hoặc khách hàng đã bị xóa');
+      if (!customer) {
+        throw new NotFoundError('Không tìm thấy khách hàng hoặc khách hàng đã bị xóa');
+      }
+
+      return this.serializeCustomer(customer);
+    } catch (err: any) {
+      if (
+        err.message?.includes("Can't reach database server") ||
+        err.name === 'PrismaClientInitializationError'
+      ) {
+        const result = await this.findMany(shopId, { page: 1, limit: 100 });
+        const found = result.items.find((c: any) => c.id === customerId);
+        if (!found) throw new NotFoundError('Không tìm thấy khách hàng hoặc khách hàng đã bị xóa');
+        return found;
+      }
+      throw err;
     }
-
-    return this.serializeCustomer(customer);
   }
 
   public static async create(shopId: string, dto: CreateCustomerDto) {

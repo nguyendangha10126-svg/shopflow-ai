@@ -12,6 +12,7 @@ import { useToast } from '../components/ui/Toast';
 import MessageIngestionModal from '../components/ai/MessageIngestionModal';
 import DraftOrderReviewModal from '../components/ai/DraftOrderReviewModal';
 import { ProcessedAIDraftResult } from '../types/ai.types';
+import { formatRelativeTime } from '../utils/format';
 
 export type OrderStatus =
   | 'DRAFT'
@@ -519,8 +520,11 @@ export const OrdersPage: React.FC = () => {
                         ✍️ Thủ công
                       </Badge>
                     )}
-                    <span className="text-xs text-slate-400">
-                      {new Date(order.created_at).toLocaleString('vi-VN')}
+                    <span
+                      className="text-xs text-slate-400"
+                      title={new Date(order.created_at).toLocaleString('vi-VN')}
+                    >
+                      {formatRelativeTime(order.created_at)}
                     </span>
                   </div>
 

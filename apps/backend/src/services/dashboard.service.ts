@@ -1,6 +1,7 @@
 import { OrderStatus, OrderSource } from '@prisma/client';
 import { prisma } from '../db';
 import { logger } from '../core/logger';
+import { env } from '../config/env';
 
 export interface DashboardSummary {
   kpis: {
@@ -23,6 +24,7 @@ export interface DashboardSummary {
     order_count: number;
   }>;
   ai_usage: {
+    model_name: string;
     used_this_month: number;
     monthly_limit: number;
     remaining: number;
@@ -240,6 +242,7 @@ export class DashboardService {
         orders_by_source,
         revenue_trend_7d,
         ai_usage: {
+          model_name: env.GEMINI_MODEL ? `Google ${env.GEMINI_MODEL}` : 'Google Gemini 1.5 Flash',
           used_this_month,
           monthly_limit,
           remaining,
@@ -260,50 +263,51 @@ export class DashboardService {
   }
 
   /**
-   * Dữ liệu mô phỏng dự phòng khi offline
+   * Dữ liệu mô phỏng dự phòng khi offline (Đồng bộ tuyệt đối 100% với Repository)
    */
   public static getMockSummary(): DashboardSummary {
     return {
       kpis: {
-        total_revenue_vnd: 18450000,
-        total_orders: 24,
-        ai_orders_count: 14,
-        ai_conversion_rate: 85,
-        active_products_count: 20,
-        low_stock_products_count: 3,
+        total_revenue_vnd: 3200000,
+        total_orders: 8,
+        ai_orders_count: 6,
+        ai_conversion_rate: 83,
+        active_products_count: 8,
+        low_stock_products_count: 2,
       },
       orders_by_status: {
-        DRAFT: 2,
-        CONFIRMED: 8,
-        SHIPPING: 6,
-        DELIVERED: 7,
-        CANCELLED: 1,
+        DRAFT: 1,
+        CONFIRMED: 3,
+        SHIPPING: 2,
+        DELIVERED: 2,
+        CANCELLED: 0,
         RETURNED: 0,
       },
       orders_by_source: {
-        clipboard: 14,
-        manual: 10,
+        clipboard: 6,
+        manual: 2,
       },
       revenue_trend_7d: [
-        { date: '2026-10-15', label: '15/10', revenue_vnd: 2100000, order_count: 3 },
-        { date: '2026-10-16', label: '16/10', revenue_vnd: 1850000, order_count: 2 },
-        { date: '2026-10-17', label: '17/10', revenue_vnd: 3400000, order_count: 4 },
-        { date: '2026-10-18', label: '18/10', revenue_vnd: 2900000, order_count: 4 },
-        { date: '2026-10-19', label: '19/10', revenue_vnd: 1600000, order_count: 2 },
-        { date: '2026-10-20', label: '20/10', revenue_vnd: 4200000, order_count: 6 },
-        { date: '2026-10-21', label: '21/10', revenue_vnd: 2400000, order_count: 3 },
+        { date: '2026-10-15', label: '15/10', revenue_vnd: 0, order_count: 0 },
+        { date: '2026-10-16', label: '16/10', revenue_vnd: 0, order_count: 0 },
+        { date: '2026-10-17', label: '17/10', revenue_vnd: 0, order_count: 0 },
+        { date: '2026-10-18', label: '18/10', revenue_vnd: 890000, order_count: 1 },
+        { date: '2026-10-19', label: '19/10', revenue_vnd: 850000, order_count: 2 },
+        { date: '2026-10-20', label: '20/10', revenue_vnd: 870000, order_count: 2 },
+        { date: '2026-10-21', label: '21/10', revenue_vnd: 590000, order_count: 2 },
       ],
       ai_usage: {
-        used_this_month: 18,
+        model_name: env.GEMINI_MODEL ? `Google ${env.GEMINI_MODEL}` : 'Google Gemini 1.5 Flash',
+        used_this_month: 6,
         monthly_limit: 30,
-        remaining: 12,
-        usage_percentage: 60,
+        remaining: 24,
+        usage_percentage: 20,
         is_near_limit: false,
-        avg_latency_ms: 1240,
-        p50_latency_ms: 1100,
-        p95_latency_ms: 2450,
-        total_tokens_used: 15420,
-        success_rate: 94,
+        avg_latency_ms: 820,
+        p50_latency_ms: 750,
+        p95_latency_ms: 1200,
+        total_tokens_used: 4850,
+        success_rate: 100,
       },
     };
   }

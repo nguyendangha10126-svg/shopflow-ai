@@ -17,6 +17,7 @@ interface Customer {
   address?: string | null;
   notes?: string | null;
   total_orders?: number;
+  total_spent_vnd?: number;
   total_spend_vnd?: number;
   created_at: string;
 }
@@ -191,9 +192,13 @@ export const CustomersPage: React.FC = () => {
                       📞 {c.phone}
                     </p>
                   </div>
-                  <Badge variant="system" size="sm">
-                    Khách quen
-                  </Badge>
+                  {(c.total_orders ?? 0) >= 3 ? (
+                    <Badge variant="system" size="sm">
+                      Khách quen
+                    </Badge>
+                  ) : (
+                    <span className="text-[11px] text-slate-400">Khách mới</span>
+                  )}
                 </div>
 
                 <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
@@ -213,7 +218,7 @@ export const CustomersPage: React.FC = () => {
                     Đã mua: <b>{c.total_orders ?? 0}</b> đơn
                   </span>
                   <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    Chi tiêu: <MoneyText amount={c.total_spend_vnd ?? 0} />
+                    Chi tiêu: <MoneyText amount={c.total_spent_vnd ?? c.total_spend_vnd ?? 0} />
                   </span>
                 </div>
               </div>

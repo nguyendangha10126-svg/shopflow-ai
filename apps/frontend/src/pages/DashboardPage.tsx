@@ -32,6 +32,7 @@ export interface DashboardSummaryData {
     order_count: number;
   }>;
   ai_usage: {
+    model_name?: string;
     used_this_month: number;
     monthly_limit: number;
     remaining: number;
@@ -143,7 +144,7 @@ export const DashboardPage: React.FC = () => {
           </div>
           <p className="text-xs sm:text-sm text-indigo-200">
             Hôm nay bạn có{' '}
-            <b>{summary.orders_by_status.CONFIRMED + summary.orders_by_status.SHIPPING}</b> đơn đang xử
+            <b>{(summary.orders_by_status.CONFIRMED || 0) + (summary.orders_by_status.SHIPPING || 0)}</b> đơn đang xử
             lý và <b>{summary.ai_usage.remaining}</b> lượt phân tích AI còn lại trong tháng.
           </p>
         </div>
@@ -196,12 +197,14 @@ export const DashboardPage: React.FC = () => {
             <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
               {summary.kpis.total_orders} <span className="text-xs font-normal text-slate-400">đơn</span>
             </div>
-            <div className="flex items-center space-x-1 text-[11px] text-slate-500">
-              <span className="text-emerald-600 font-semibold">{summary.orders_by_status.CONFIRMED} chốt</span>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+              <span className="text-emerald-600 font-semibold">{summary.orders_by_status.CONFIRMED || 0} chốt</span>
               <span>•</span>
-              <span className="text-sky-600 font-semibold">{summary.orders_by_status.SHIPPING} giao</span>
+              <span className="text-sky-600 font-semibold">{summary.orders_by_status.SHIPPING || 0} giao</span>
               <span>•</span>
-              <span className="text-amber-600 font-semibold">{summary.orders_by_status.DRAFT} nháp</span>
+              <span className="text-indigo-600 font-semibold">{summary.orders_by_status.DELIVERED || 0} xong</span>
+              <span>•</span>
+              <span className="text-amber-600 font-semibold">{summary.orders_by_status.DRAFT || 0} nháp</span>
             </div>
           </div>
         </Card>
@@ -364,7 +367,7 @@ export const DashboardPage: React.FC = () => {
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
               <span>⚡ Hạn Mức & Giám Sát AI Tháng Này</span>
               <Badge variant="ai" size="sm">
-                Google Gemini 1.5 Flash
+                {summary.ai_usage.model_name || 'Google Gemini 1.5 Flash'}
               </Badge>
             </h2>
             <p className="text-xs text-slate-500">

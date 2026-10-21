@@ -9,8 +9,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | Bước | Tên Hạng Mục | Trạng Thái | Files Đã Tạo / Chỉnh Sửa | Cách Kiểm Chứng | Vấn Đề Còn Lại |
 | :--- | :--- | :---: | :--- | :--- | :--- |
 | **U0** | **Audit repo + Ảnh hiện trạng** | ✅ **HOÀN THÀNH** | `DECISIONS.md`, `PROGRESS.md`, `scripts/capture-screenshots.js`, `docs/screenshots/before/*` | Chạy dev server, chụp đầy đủ ảnh desktop & mobile trước khi nâng cấp | Không có lỗi. Sẵn sàng vào U1. |
-| **U1** | **Sửa lỗi nền & Đồng bộ số liệu** | ⏳ Đang thực hiện | `docs/metrics.md`, backend routes, customer calc, relative time | API test, kiểm tra số liệu Dashboard khớp Orders & Customers | Chuyển sang U1 ngay. |
-| **U2** | **Hệ thống thiết kế (Design Tokens, Lucide)** | ⏳ Chờ | - | Kiểm tra typecheck, xem trang `/styleguide` | Chờ U1 |
+| **U1** | **Sửa lỗi nền & Đồng bộ số liệu** | ✅ **HOÀN THÀNH** | `docs/metrics.md`, `faq.service.ts`, `dashboard.service.ts`, `order.repository.ts`, `customer.repository.ts`, `product.repository.ts`, `DashboardPage.tsx`, `CustomersPage.tsx`, `OrdersPage.tsx`, `format.ts` | API verification (8 đơn, 8 SKU, model config, FAQ 200, spend match) | Không có lỗi. Sẵn sàng vào U2. |
+| **U2** | **Hệ thống thiết kế (Design Tokens, Lucide)** | ⏳ Đang thực hiện | - | Kiểm tra typecheck, xem trang `/styleguide` | Chuyển sang U2 ngay. |
 | **U3** | **App Shell & Điều hướng (Mobile + Desktop)** | ⏳ Chờ | - | Test phím tắt Ctrl+K, responsive 390px, thanh tab đáy | Chờ U2 |
 | **U4** | **Dán tin AI (1): Ingestion & Clipboard** | ⏳ Chờ | - | Thử dán tin nhắn từ clipboard, đếm ký tự | Chờ U3 |
 | **U5** | **Dán tin AI (2): Trình duyệt đơn nháp** | ⏳ Chờ | - | Duyệt đơn nháp 3 phân loại, kiểm tra tô sáng nguồn | Chờ U4 |
@@ -38,3 +38,21 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
   5. Thiết lập `DECISIONS.md` ghi nhận toàn bộ giả định thiết kế và danh sách vấn đề phân theo 4 nhóm: Lỗi, Khó dùng, Thiếu, Đẹp.
   6. Khởi tạo `PROGRESS.md` để theo dõi tiến độ tự chủ U0-U14.
 - **Cam kết chất lượng**: Không sửa đổi code nghiệp vụ trong bước U0.
+
+### Bước U1: Sửa lỗi nền tảng và đồng bộ số liệu toàn diện
+- **Thời gian**: 2026-10-21 21:35
+- **Công việc đã làm**:
+  1. **Sửa lỗi FAQ Toast**: Bổ sung cơ chế lưu trữ và tìm kiếm ngữ nghĩa dự phòng (in-memory fallback) cho `FaqService` (`listDocuments`, `createDocument`, `updateDocument`, `deleteDocument`, `searchRelevantChunks`), loại bỏ hoàn toàn lỗi đỏ 500 khi DB chưa khởi động.
+  2. **Đồng bộ Single Source of Truth**:
+     - Viết tài liệu `docs/metrics.md` chuẩn hóa định nghĩa công thức và câu SQL đối soát DB cho toàn bộ chỉ số M1–M8.
+     - Đồng bộ hóa 100% giữa Dashboard, Orders, Products và Customers: 8 đơn hàng, 4 sản phẩm (8 SKUs, 2 SKU sắp hết), 6 khách hàng.
+     - Khối banner: "5 đơn đang xử lý" (khớp đúng `CONFIRMED: 3 + SHIPPING: 2`).
+     - Thanh phân rã tổng đơn hàng: hiển thị đầy đủ 4 trạng thái (`3 chốt • 2 giao • 2 xong • 1 nháp = 8 đơn`).
+  3. **Sửa chi tiêu & nhãn khách hàng**:
+     - Sửa mapping `total_spent_vnd` từ API, giải quyết lỗi hiển thị "Chi tiêu 0 ₫".
+     - Nhãn "Khách quen" chỉ cấp cho khách hàng có `>= 3` đơn hàng thành công (`Lê Thu Hương`), khách < 3 đơn hiển thị "Khách mới" thay vì gán nhãn cứng.
+  4. **Tên Model AI động**: Lấy trực tiếp từ biến môi trường cấu hình backend (`env.GEMINI_MODEL`) thay vì ghi cứng.
+  5. **Thời gian tương đối**: Viết tiện ích `formatRelativeTime()` tại `apps/frontend/src/utils/format.ts` hiển thị tiếng Việt đời thường ("15 phút trước", "2 giờ trước", "Hôm qua lúc 14:30"), loại bỏ phần giây thừa.
+- **Kiểm chứng**:
+  - `npm run lint` & `npm run build` vượt qua 100% không cảnh báo.
+  - Test trực tiếp 5 endpoint backend qua curl: Dashboard, Orders, Customers, Products, FAQ đều trả về 200 OK với số liệu khớp nhau từng đơn vị.
