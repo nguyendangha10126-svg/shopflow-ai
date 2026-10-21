@@ -110,4 +110,17 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+// 7. Hoàn tác xóa mềm sản phẩm (Restore)
+router.post('/:id/restore', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const restored = await ProductService.restoreProduct(req.user!.shopId, req.params.id);
+    res.status(200).json({
+      message: 'Khôi phục sản phẩm thành công',
+      data: { product: restored },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

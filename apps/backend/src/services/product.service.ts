@@ -27,6 +27,10 @@ export class ProductService {
     return ProductRepository.softDelete(shopId, productId);
   }
 
+  public static async restoreProduct(shopId: string, productId: string) {
+    return ProductRepository.restore(shopId, productId);
+  }
+
   public static async updateVariant(shopId: string, variantId: string, dto: UpdateVariantDto) {
     return ProductRepository.updateVariant(shopId, variantId, dto);
   }

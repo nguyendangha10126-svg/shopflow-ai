@@ -15,9 +15,9 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | **U4** | **Dán tin AI (1): Ingestion & Clipboard** | ✅ **HOÀN THÀNH** | `MessageIngestionModal.tsx`, `Modal.tsx` | Clipboard API fallback, 3 tin mẫu 1 chạm, đếm 2.000 ký tự, Lucide icons | Không có lỗi. Sẵn sàng vào U5. |
 | **U5** | **Dán tin AI (2): Trình duyệt đơn nháp** | ✅ **HOÀN THÀNH** | `DraftOrderReviewModal.tsx` | Phân cấp 3 loại dữ liệu, tô sáng nguồn tin, sao chép câu hỏi khách, thanh hành động cố định | Không có lỗi. Sẵn sàng vào U6. |
 | **U6** | **Quản lý Đơn hàng & Drawer thao tác nhanh** | ✅ **HOÀN THÀNH** | `Drawer.tsx`, `OrderDetailDrawer.tsx`, `OrdersPage.tsx` | Drawer chi tiết, chip đếm trạng thái động, sao chép tin nhắn Zalo, gọi khách, modal xác nhận | Không có lỗi. Sẵn sàng vào U7. |
-| **U7** | **Quản lý Sản phẩm (1): Lưới, Form, Undo** | ⏳ Đang thực hiện | - | Test thêm/sửa sản phẩm, xóa mềm có nút Hoàn tác | Chuyển sang U7 ngay. |
-| **U8** | **Quản lý Sản phẩm (2): Tải ảnh & Storage** | ⏳ Chờ | - | Upload ảnh <5MB, client resize, ProductImage fallback | Chờ U7 |
-| **U9** | **Khách hàng & Hồ sơ chi tiết (CRM mini)** | ⏳ Chờ | - | Lịch sử đơn hàng của khách, nhãn Khách quen (>=3 đơn) | Chờ U8 |
+| **U7** | **Quản lý Sản phẩm (1): Lưới, Form, Undo** | ✅ **HOÀN THÀNH** | `ProductsPage.tsx`, `ProductImage.tsx`, `product.repository.ts`, `product.routes.ts` | Chế độ xem Lưới/Bảng, Thêm/Sửa sản phẩm, Xóa mềm có Hoàn tác (Undo) | Không có lỗi. Sẵn sàng vào U8. |
+| **U8** | **Quản lý Sản phẩm (2): Tải ảnh & Storage** | ✅ **HOÀN THÀNH** | `storage.provider.ts`, `upload.routes.ts`, `ImageUploader.tsx`, `image.ts` | StorageProvider (Disk dev / Cloudinary prod), Client resize & nén WebP, magic bytes | Không có lỗi. Sẵn sàng vào U9. |
+| **U9** | **Khách hàng & Hồ sơ chi tiết (CRM mini)** | ⏳ Đang thực hiện | - | Lịch sử đơn hàng của khách, nhãn Khách quen (>=3 đơn) | Chuyển sang U9 ngay. |
 | **U10**| **Bảng điều khiển Tổng quan (Dashboard)** | ⏳ Chờ | - | Khối Cần xử lý ngay, Biểu đồ có trục/giá trị, KPI | Chờ U9 |
 | **U11**| **Chính sách & Trả lời khách (FAQ RAG)** | ⏳ Chờ | - | Trình soạn thảo chính sách, giao diện chat Thử hỏi | Chờ U10 |
 | **U12**| **Landing Page, Onboarding & Chế độ Demo** | ⏳ Chờ | - | Luồng đăng nhập, trang giới thiệu, onboarding 3 bước | Chờ U11 |
@@ -146,5 +146,35 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
   6. **Loại bỏ 100% Emoji**: Thay thế toàn bộ bằng Lucide icons (`CheckCircle2`, `Truck`, `Clock`, `XCircle`, `Plus`, `Phone`, `Share2`, `Eye`,...).
 - **Kiểm chứng**:
   - `npm run lint` và `npm run build` đều vượt qua 100% không cảnh báo.
+
+### Bước U7: Nâng cấp Quản lý Sản phẩm (Lưới, Bảng, Form & Hoàn tác)
+- **Thời gian**: 2026-10-21 21:57
+- **Công việc đã làm**:
+  1. **Chế độ xem kép Lưới (Grid) & Bảng (Table)**:
+     - Lưới thẻ ảnh thời trang trực quan có huy hiệu trạng thái kho (Sắp hết hàng $\le 5$ cái) và phân loại kích cỡ.
+     - Bảng danh sách chi tiết SKU, số lượng tồn kho tổng, đơn giá thấp nhất và hành động nhanh.
+  2. **Thanh chỉ số nhanh (Catalog KPIs)**:
+     - Thống kê 4 sản phẩm, 8 SKU, 2 SKU sắp hết hàng, 83 chiếc tồn kho thực tế khớp Single Source of Truth.
+  3. **Thêm / Sửa sản phẩm linh hoạt**:
+     - Hỗ trợ đổi tên, danh mục, mô tả và tinh chỉnh giá bán/tồn kho từng biến thể.
+  4. **Xóa mềm có Hoàn tác (Soft Delete with Undo)**:
+     - Khi bấm xóa, sản phẩm được đánh dấu xóa mềm và kích hoạt thanh thông báo nổi với nút **"Hoàn tác"** (Undo) gọi `POST /products/:id/restore` phục hồi ngay tức thì.
+- **Kiểm chứng**: `npm run lint` và `npm run build` đạt 100%.
+
+### Bước U8: Hệ thống Tải ảnh An toàn & Lớp Trừu tượng StorageProvider
+- **Thời gian**: 2026-10-21 21:59
+- **Công việc đã làm**:
+  1. **Lớp trừu tượng `StorageProvider` (`storage.provider.ts`)**:
+     - `LocalStorageProvider`: Lưu trữ an toàn tại `public/uploads` trong môi trường phát triển cục bộ.
+     - `CloudinaryStorageProvider`: Adapter kết nối Cloudinary cho môi trường Production khi cấu hình biến môi trường.
+     - Đã ghi tài liệu so sánh Cloudinary vs Supabase Storage vs Cloudflare R2 vào `DECISIONS.md`.
+  2. **Bảo mật tệp tải lên (Magic Bytes Validation)**:
+     - Kiểm tra chuỗi byte đầu (FF D8 FF cho JPEG, 89 50 4E 47 cho PNG, RIFF/WEBP cho WebP), chặn đứng mã độc giả dạng ảnh.
+  3. **Nén và co giãn ảnh phía Client (`image.ts`)**:
+     - Canvas resize tự động kích thước tối đa 1200x1200px, nén WebP/JPEG chất lượng cao, giới hạn $\le 5$MB/ảnh.
+  4. **Giao diện Tải ảnh `ImageUploader.tsx` & Hiển thị `ProductImage.tsx`**:
+     - Hỗ trợ chọn tối đa 5 ảnh / sản phẩm, chọn ảnh bìa (Cover), xóa ảnh, hiển thị khung ảnh dự phòng thanh lịch khi chưa có ảnh hoặc ảnh lỗi.
+- **Kiểm chứng**: Tuyến đường `POST /api/v1/upload/image` và `npm run build` thành công mỹ mãn.
+
 
 

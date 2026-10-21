@@ -6,6 +6,7 @@ import { env } from './config/env';
 import { logger } from './core/logger';
 import { NotFoundError } from './core/errors/app-error';
 import { errorHandler } from './api/middlewares/error.middleware';
+import path from 'path';
 import healthRoutes from './api/routes/health.routes';
 import authRoutes from './api/routes/auth.routes';
 import productRoutes from './api/routes/product.routes';
@@ -14,6 +15,7 @@ import orderRoutes from './api/routes/order.routes';
 import aiRoutes from './api/routes/ai.routes';
 import dashboardRoutes from './api/routes/dashboard.routes';
 import faqRoutes from './api/routes/faq.routes';
+import uploadRoutes from './api/routes/upload.routes';
 import testRoutes from './api/routes/test.routes';
 
 const app = express();
@@ -44,9 +46,12 @@ app.use(
   })
 );
 
-// 3. Giới hạn kích thước Body (1MB) chống DoS
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+// 3. Giới hạn kích thước Body (10MB) hỗ trợ tải ảnh an toàn
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Phục vụ tệp tĩnh tải lên cục bộ
+app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
 // 4. Rate Limiting toàn cục
 const globalLimiter = rateLimit({
@@ -104,6 +109,7 @@ app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/faq', faqRoutes);
+app.use('/api/v1/upload', uploadRoutes);
 
 // Tuyến đường kiểm thử tự động (chỉ bật ở dev/test)
 if (env.NODE_ENV !== 'production') {
