@@ -1,0 +1,26 @@
+{
+  "name": "ShopFlow AI - Quản lý đơn hàng & Kho",
+  "short_name": "ShopFlow",
+  "description": "Trợ lý AI bóc tách tin nhắn chốt đơn & quản lý kho tức thời cho shop thời trang",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

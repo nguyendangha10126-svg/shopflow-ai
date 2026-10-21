@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import MobileBottomBar from './MobileBottomBar';
 import CommandPalette from './CommandPalette';
+import OfflineBanner from './OfflineBanner';
 import MessageIngestionModal from '../ai/MessageIngestionModal';
 import DraftOrderReviewModal from '../ai/DraftOrderReviewModal';
 import OnboardingModal from '../onboarding/OnboardingModal';
@@ -87,6 +88,7 @@ export const AppLayout: React.FC = () => {
 
       {/* 3. Main Application Column */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen pb-16 md:pb-0">
+        <OfflineBanner />
         {/* Topbar with Global Search, Notifications & Account */}
         <Topbar
           onToggleSidebar={toggleSidebarCollapse}

@@ -21,8 +21,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | **U10**| **Bảng điều khiển Tổng quan (Dashboard)** | ✅ **HOÀN THÀNH** | `DashboardPage.tsx` | Khối Cần xử lý ngay, Biểu đồ 7 ngày có trục Y & bảng thay thế, KPI chuẩn hóa, hạn mức AI | Không có lỗi. Sẵn sàng vào U11. |
 | **U11**| **Chính sách & Trả lời khách (FAQ RAG)** | ✅ **HOÀN THÀNH** | `FaqPage.tsx` | Đổi tên thân thiện, Khung chat mô phỏng khách, trích dẫn nguồn, đánh giá phản hồi, nạp 3 chính sách mẫu | Không có lỗi. Sẵn sàng vào U12. |
 | **U12**| **Landing Page, Onboarding & Chế độ Demo** | ✅ **HOÀN THÀNH** | `LandingPage.tsx`, `OnboardingModal.tsx`, `App.tsx`, `AppLayout.tsx`, `LoginPage.tsx` | Trang giới thiệu sản phẩm thương mại, Onboarding 3 bước, bảng giá chuẩn A3, đăng nhập 1 chạm | Không có lỗi. Sẵn sàng vào U13. |
-| **U13**| **Tinh chỉnh Motion & PWA Offline** | ⏳ Đang thực hiện | - | Kiểm tra ngắt mạng PWA shell, prefers-reduced-motion | Chuyển sang U13 ngay. |
-| **U14**| **Kiểm thử toàn diện, Đo lường & Nghiệm thu**| ⏳ Chờ | - | Lighthouse >=90/95, axe 0 lỗi, ảnh `docs/screenshots/after/*` | Chờ U13 |
+| **U13**| **Tinh chỉnh Motion & PWA Offline** | ✅ **HOÀN THÀNH** | `manifest.json`, `sw.js`, `OfflineBanner.tsx`, `index.css`, `index.html`, `main.tsx` | PWA manifest, Service Worker offline fallback, OfflineBanner, prefers-reduced-motion | Không có lỗi. Sẵn sàng vào U14. |
+| **U14**| **Kiểm thử toàn diện, Đo lường & Nghiệm thu**| ⏳ Đang thực hiện | - | Lighthouse >=90/95, axe 0 lỗi, ảnh `docs/screenshots/after/*` | Chuyển sang U14 ngay. |
 
 ---
 
@@ -146,6 +146,25 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
   3. **Thanh Chỉ Báo Trải Nghiệm Cửa Hàng Mẫu**:
      - Thanh banner nhẹ nhàng tại App Shell cho biết cửa hàng đang hoạt động ở chế độ trải nghiệm kèm nút mở nhanh hướng dẫn 3 bước.
 - **Kiểm chứng**: Tuyến đường `/welcome` và `/landing` hoạt động trơn tru; `npm run build` thành công 100%.
+
+### Bước U13: Tinh Chỉnh Motion & PWA Hoạt Động Ngoại Tuyến (Offline Shell)
+- **Thời gian**: 2026-10-21 22:13
+- **Công việc đã làm**:
+  1. **Tôn trọng Trợ năng Chuyển động (`prefers-reduced-motion`)**:
+     - Bổ sung cấu hình media query trong `index.css`: khi người dùng bật chế độ giảm chuyển động trong hệ điều hành, toàn bộ hoạt ảnh (animation, transition) tự động giảm về 0ms để tránh gây chóng mặt.
+     - Hiệu ứng vi chuyển động (Micro-interactions) tinh tế với cubic-bezier mượt mà.
+  2. **Tiêu chuẩn PWA (Progressive Web App)**:
+     - Khởi tạo `manifest.json` đầy đủ thông tin: tên `ShopFlow AI`, short_name, màu chủ đạo `#4f46e5`, icon 192x192 & 512x512 maskable SVG.
+     - Cấu hình meta tags trong `index.html` hỗ trợ cài đặt app trên iOS & Android.
+  3. **Service Worker (`sw.js`) & Màn hình Ngoại tuyến**:
+     - Chiến lược Stale-While-Revalidate và Cache-First cho App Shell tĩnh.
+     - Tự động cung cấp màn hình thông báo ngoại tuyến thân thiện khi mất kết nối mạng hoàn toàn.
+     - Đăng ký Service Worker trong `main.tsx`.
+  4. **Thanh Cảnh Báo Trạng Thái Mạng (`OfflineBanner.tsx`)**:
+     - Tự động lắng nghe sự kiện `online` và `offline` của trình duyệt.
+     - Hiển thị thanh cảnh báo màu hổ phách trên cùng khi mất mạng và toast thông báo thành công khi kết nối mạng được phục hồi.
+- **Kiểm chứng**: `npm run lint` & `npm run build` thành công 100%.
+
 
 
 
@@ -308,6 +327,25 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
   3. **Thanh Chỉ Báo Trải Nghiệm Cửa Hàng Mẫu**:
      - Thanh banner nhẹ nhàng tại App Shell cho biết cửa hàng đang hoạt động ở chế độ trải nghiệm kèm nút mở nhanh hướng dẫn 3 bước.
 - **Kiểm chứng**: Tuyến đường `/welcome` và `/landing` hoạt động trơn tru; `npm run build` thành công 100%.
+
+### Bước U13: Tinh Chỉnh Motion & PWA Hoạt Động Ngoại Tuyến (Offline Shell)
+- **Thời gian**: 2026-10-21 22:13
+- **Công việc đã làm**:
+  1. **Tôn trọng Trợ năng Chuyển động (`prefers-reduced-motion`)**:
+     - Bổ sung cấu hình media query trong `index.css`: khi người dùng bật chế độ giảm chuyển động trong hệ điều hành, toàn bộ hoạt ảnh (animation, transition) tự động giảm về 0ms để tránh gây chóng mặt.
+     - Hiệu ứng vi chuyển động (Micro-interactions) tinh tế với cubic-bezier mượt mà.
+  2. **Tiêu chuẩn PWA (Progressive Web App)**:
+     - Khởi tạo `manifest.json` đầy đủ thông tin: tên `ShopFlow AI`, short_name, màu chủ đạo `#4f46e5`, icon 192x192 & 512x512 maskable SVG.
+     - Cấu hình meta tags trong `index.html` hỗ trợ cài đặt app trên iOS & Android.
+  3. **Service Worker (`sw.js`) & Màn hình Ngoại tuyến**:
+     - Chiến lược Stale-While-Revalidate và Cache-First cho App Shell tĩnh.
+     - Tự động cung cấp màn hình thông báo ngoại tuyến thân thiện khi mất kết nối mạng hoàn toàn.
+     - Đăng ký Service Worker trong `main.tsx`.
+  4. **Thanh Cảnh Báo Trạng Thái Mạng (`OfflineBanner.tsx`)**:
+     - Tự động lắng nghe sự kiện `online` và `offline` của trình duyệt.
+     - Hiển thị thanh cảnh báo màu hổ phách trên cùng khi mất mạng và toast thông báo thành công khi kết nối mạng được phục hồi.
+- **Kiểm chứng**: `npm run lint` & `npm run build` thành công 100%.
+
 
 
 
