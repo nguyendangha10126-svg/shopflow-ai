@@ -1,4 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Copy,
+  Trash2,
+  HelpCircle,
+  Save,
+  User,
+  ShoppingBag,
+  Info,
+  AlertTriangle,
+  FileText,
+} from 'lucide-react';
 import { apiClient, ApiClientError } from '../../services/api';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
@@ -23,7 +36,6 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
 }) => {
   const { showToast } = useToast();
 
-  // Dữ liệu khách hàng chỉnh sửa được
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [shippingAddress, setShippingAddress] = useState('');
@@ -31,14 +43,13 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
   const [discount, setDiscount] = useState(0);
   const [orderNotes, setOrderNotes] = useState('');
 
-  // Danh sách sản phẩm được nhân viên xác nhận/chọn
   const [items, setItems] = useState<MatchedOrderItem[]>([]);
   const [highlightKeyword, setHighlightKeyword] = useState<string | null>(null);
+  const [isCopiedQuestion, setIsCopiedQuestion] = useState(false);
 
   const [isConfirming, setIsConfirming] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Đồng bộ dữ liệu khi modal mở hoặc reviewData thay đổi
   useEffect(() => {
     if (reviewData) {
       setCustomerName(reviewData.customer?.name || '');
@@ -50,12 +61,12 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
       setItems(reviewData.matched_items || []);
       setHighlightKeyword(null);
       setErrorMessage('');
+      setIsCopiedQuestion(false);
     }
   }, [reviewData, isOpen]);
 
   if (!reviewData) return null;
 
-  // Tính nhẩm tổng tiền dựa trên GIÁ DB
   const calculateTotals = () => {
     let subtotal = 0;
     items.forEach((item) => {
@@ -69,7 +80,7 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
 
   const { subtotal, total } = calculateTotals();
 
-  // Tô sáng từ khóa trong tin nhắn gốc
+  // Tô sáng từ khóa tương ứng trong tin nhắn gốc của khách
   const renderHighlightedMessage = () => {
     const raw = reviewData.raw_anonymized_message;
     if (!highlightKeyword || !highlightKeyword.trim()) {
@@ -77,7 +88,6 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
     }
 
     try {
-      // Tìm từ khóa case-insensitive
       const escaped = highlightKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const parts = raw.split(new RegExp(`(${escaped})`, 'gi'));
 
@@ -87,7 +97,7 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
             part.toLowerCase() === highlightKeyword.toLowerCase() ? (
               <mark
                 key={i}
-                className="bg-yellow-300 dark:bg-yellow-500/80 text-slate-900 font-bold px-1.5 py-0.5 rounded shadow-sm border border-yellow-400"
+                className="bg-yellow-300 dark:bg-yellow-500/80 text-slate-900 font-bold px-1 py-0.5 rounded shadow-sm"
               >
                 {part}
               </mark>
@@ -102,26 +112,27 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
     }
   };
 
-  // 1-Click Sao chép toàn bộ câu hỏi gửi khách
+  // Sao chép câu hỏi làm rõ gửi lại cho khách
   const handleCopyStaffQuestions = async () => {
     const questions = reviewData.questions_for_staff;
     if (!questions || questions.length === 0) return;
 
     const formattedMessage = `Dạ em chào chị ${
       customerName ? customerName : ''
-    }! ShopFlow đang chuẩn bị lên đơn cho mình nè. Em muốn xác nhận lại một chút để gửi đúng món chị thích nhé:\n${questions
+    }! Shop đang chuẩn bị lên đơn cho mình nè. Em muốn xác nhận lại một chút để gửi đúng món chị ưng ý nhé:\n${questions
       .map((q) => `• ${q}`)
       .join('\n')}\nChị nhắn lại sớm để shop đóng gói ship cho mình ngay nha! Cảm ơn chị ❤️`;
 
     try {
       await navigator.clipboard.writeText(formattedMessage);
-      showToast('Đã sao chép câu hỏi gửi khách! Bạn chỉ cần dán sang tin nhắn gửi khách.', 'success');
+      setIsCopiedQuestion(true);
+      showToast('Đã sao chép câu hỏi! Bạn chỉ cần dán sang tin nhắn gửi khách.', 'success');
+      setTimeout(() => setIsCopiedQuestion(false), 3000);
     } catch {
       showToast('Không thể sao chép tự động. Hãy sao chép nội dung bằng tay.', 'error');
     }
   };
 
-  // Chọn biến thể thay thế cho trường hợp AMBIGUOUS
   const handleSelectAlternativeVariant = (
     itemIndex: number,
     potential: {
@@ -149,7 +160,6 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
     showToast(`Đã chọn biến thể: ${potential.variant_name}`, 'success');
   };
 
-  // Điều chỉnh số lượng mặt hàng
   const handleQuantityChange = (index: number, newQty: number) => {
     const validQty = Math.max(1, newQty);
     setItems((prev) => {
@@ -159,12 +169,11 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
     });
   };
 
-  // Xóa một mặt hàng khỏi đơn
   const handleRemoveItem = (index: number) => {
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // 1. Xác nhận chốt đơn & Trừ kho nguyên tử
+  // Chốt đơn & Trừ kho nguyên tử
   const handleConfirmAndDeductStock = async () => {
     setErrorMessage('');
 
@@ -184,14 +193,12 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
     setIsConfirming(true);
     try {
       if (reviewData.draft_order_id) {
-        // Đã có bản nháp trong DB, gọi endpoint confirm để trừ kho
         await apiClient.post(`/orders/${reviewData.draft_order_id}/confirm`, {});
         showToast(
-          `Đã chốt đơn #${reviewData.order_number || ''} và trừ kho nguyên tử thành công!`,
+          `Đã chốt đơn #${reviewData.order_number || ''} và trừ kho thành công!`,
           'success'
         );
       } else {
-        // Tạo đơn hàng mới ở trạng thái CONFIRMED
         const res = await apiClient.post<{ data: { order: { order_number: number } } }>(
           '/orders',
           {
@@ -210,7 +217,7 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
           }
         );
         showToast(
-          `Đã tạo và chốt đơn #${res.data.order.order_number} (Đã trừ kho nguyên tử)!`,
+          `Đã tạo và chốt đơn #${res.data.order.order_number} thành công!`,
           'success'
         );
       }
@@ -228,7 +235,7 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
     }
   };
 
-  // 2. Lưu dạng nháp (Chưa trừ kho)
+  // Lưu dạng nháp (Chưa trừ kho)
   const handleSaveAsDraft = async () => {
     setErrorMessage('');
     setIsConfirming(true);
@@ -253,23 +260,13 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
           });
         }
       }
-      showToast('Đã lưu đơn hàng ở trạng thái Bản Nháp (Kho giữ nguyên).', 'info');
+      showToast('Đã lưu đơn hàng ở trạng thái Bản Nháp (Tồn kho giữ nguyên).', 'info');
       onOrderConfirmed();
       onClose();
     } catch (err: any) {
       setErrorMessage(err.message || 'Lỗi khi lưu bản nháp');
     } finally {
       setIsConfirming(false);
-    }
-  };
-
-  // Phím tắt Ctrl + Enter để chốt đơn nhanh
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      e.preventDefault();
-      if (!isConfirming) {
-        handleConfirmAndDeductStock();
-      }
     }
   };
 
@@ -280,17 +277,19 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={() => !isConfirming && onClose()}
-      title="Duyệt Đơn Nháp AI (Kiểm Tra 3 Loại Dữ Liệu)"
+      title="Duyệt Đơn Nháp AI — Kiểm Tra 3 Cấp Độ Dữ Liệu"
+      maxWidth="max-w-3xl"
     >
-      <div onKeyDown={handleKeyDown} className="space-y-5 text-slate-800 dark:text-slate-200">
-        {/* 1. Thanh cảnh báo đặc biệt (Tấn công Prompt / Hỏi giá) */}
+      <div className="space-y-5 text-slate-800 dark:text-slate-200">
+        {/* 1. Cảnh báo bảo mật Prompt Injection */}
         {isPromptInjection && (
           <div
             className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-500 rounded-xl text-xs text-rose-800 dark:text-rose-200 space-y-1"
             role="alert"
           >
-            <p className="font-bold flex items-center space-x-1.5 text-sm">
-              <span>🚨 CẢNH BÁO BẢO MẬT: PHÁT HIỆN LỆNH CAN THIỆP HỆ THỐNG</span>
+            <p className="font-bold flex items-center space-x-1.5 text-sm text-rose-700 dark:text-rose-300">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>CẢNH BÁO BẢO MẬT: Phát hiện lệnh can thiệp hệ thống</span>
             </p>
             <p className="text-[11px] leading-relaxed">
               Tin nhắn chứa câu lệnh bất thường cố tình thay đổi quyền hạn hoặc giá tiền. Nút chốt đơn tự động
@@ -301,10 +300,10 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
 
         {isNotOrder && (
           <div
-            className="p-3.5 bg-sky-50 dark:bg-sky-950/40 border border-sky-300 dark:border-sky-800 rounded-xl text-xs text-sky-800 dark:text-sky-200 flex items-start space-x-2"
+            className="p-3.5 bg-sky-50 dark:bg-sky-950/40 border border-sky-300 dark:border-sky-800 rounded-xl text-xs text-sky-800 dark:text-sky-200 flex items-start space-x-2.5"
             role="alert"
           >
-            <span className="text-lg">ℹ️</span>
+            <Info className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
             <div>
               <p className="font-bold">Tin nhắn hỏi giá hoặc tư vấn chính sách</p>
               <p className="text-[11px] mt-0.5">
@@ -315,21 +314,23 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
           </div>
         )}
 
-        {/* 2. Cảnh báo lỗi */}
+        {/* 2. Cảnh báo lỗi nếu có */}
         {errorMessage && (
           <div
-            className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300"
+            className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-start space-x-2"
             role="alert"
           >
-            ⚠️ {errorMessage}
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <p className="font-medium">{errorMessage}</p>
           </div>
         )}
 
-        {/* 3. Khung hiển thị Tin Nhắn Gốc & Tính Năng Tô Sáng (Highlight) */}
+        {/* 3. Tin nhắn gốc & Tô sáng từ khóa */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center space-x-1.5">
-              <span>💬 Tin nhắn gốc của khách hàng</span>
+              <FileText className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Tin nhắn gốc của khách hàng</span>
               <Badge variant="system" size="sm">
                 Đã che SĐT
               </Badge>
@@ -338,36 +339,38 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
               <button
                 type="button"
                 onClick={() => setHighlightKeyword(null)}
-                className="text-[11px] text-indigo-600 hover:underline"
+                className="text-[11px] text-indigo-600 hover:underline font-semibold"
               >
                 Bỏ tô sáng
               </button>
             )}
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-sans leading-relaxed text-slate-700 dark:text-slate-300 max-h-28 overflow-y-auto select-text">
+          <div className="p-3.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-sans leading-relaxed text-slate-700 dark:text-slate-300 max-h-28 overflow-y-auto select-text">
             {renderHighlightedMessage()}
           </div>
-          <p className="text-[11px] text-slate-400 italic">
-            💡 Mẹo: Bấm vào từng trường bên dưới để tô sáng đoạn tương ứng trong tin nhắn gốc.
+          <p className="text-[11px] text-slate-400">
+            Mẹo: Rê chuột hoặc chạm vào từng trường bên dưới để tô sáng đoạn tương ứng trong tin nhắn gốc.
           </p>
         </div>
 
-        {/* 4. Khối "AI MUỐN HỎI BẠN" (Clarification Box) */}
+        {/* 4. Khối AI Muốn Hỏi Bạn */}
         {reviewData.questions_for_staff && reviewData.questions_for_staff.length > 0 && (
           <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/80 rounded-xl space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center space-x-1.5">
-                <span>⚠️ AI Muốn Hỏi Bạn ({reviewData.questions_for_staff.length} điểm cần làm rõ):</span>
+                <HelpCircle className="w-4 h-4 text-amber-600" />
+                <span>AI cần làm rõ ({reviewData.questions_for_staff.length} câu hỏi):</span>
               </span>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleCopyStaffQuestions}
-                className="text-xs h-7 py-0.5 border-amber-400 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                className="text-xs h-7 py-0.5 border-amber-400 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 inline-flex items-center space-x-1"
               >
-                📋 Sao chép câu hỏi gửi khách
+                {isCopiedQuestion ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{isCopiedQuestion ? 'Đã sao chép!' : 'Sao chép câu hỏi gửi khách'}</span>
               </Button>
             </div>
 
@@ -381,13 +384,14 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
           </div>
         )}
 
-        {/* 5. Khối Thông Tin Khách Hàng (DỮ LIỆU AI GỢI Ý - ⚡) */}
+        {/* 5. Cấp 2: AI Gợi ý — Thông tin người nhận */}
         <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <User className="w-3.5 h-3.5 text-purple-600" />
               <span>1. Thông tin người nhận</span>
               <Badge variant="ai" size="sm">
-                ⚡ AI Gợi ý
+                AI Gợi ý
               </Badge>
             </h3>
             <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
@@ -398,10 +402,10 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div onFocus={() => setHighlightKeyword(customerName)}>
               <Input
-                label="Họ và tên khách"
+                label="Họ và tên khách hàng"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="VD: Thu Trang"
+                placeholder="VD: Lê Thu Hương"
               />
             </div>
             <div onFocus={() => setHighlightKeyword(customerPhone || '[PHONE_1]')}>
@@ -409,7 +413,7 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
                 label="Số điện thoại nhận hàng"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
-                placeholder="VD: 0912345678"
+                placeholder="VD: 0987654321"
                 required
               />
             </div>
@@ -420,23 +424,24 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
               label="Địa chỉ giao hàng"
               value={shippingAddress}
               onChange={(e) => setShippingAddress(e.target.value)}
-              placeholder="VD: 45 Lê Duẩn, Bến Nghé, Quận 1, TP.HCM"
+              placeholder="VD: Số 15 ngõ 120 Hoàng Hoa Thám, Ba Đình, Hà Nội"
               required
             />
           </div>
         </div>
 
-        {/* 6. Khối Sản Phẩm (DỮ LIỆU HỆ THỐNG - 🔒 & DỮ LIỆU CẦN LÀM RÕ - ⚠️) */}
+        {/* 6. Cấp 1 & 3: Mặt hàng đặt mua */}
         <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
+              <ShoppingBag className="w-3.5 h-3.5 text-indigo-600" />
               <span>2. Mặt hàng đặt mua</span>
               <Badge variant="system" size="sm">
-                🔒 Giá & Kho CSDL
+                Giá & Tồn kho thực tế
               </Badge>
             </h3>
             <span className="text-[11px] text-slate-400">
-              Giá và tồn kho lấy trực tiếp từ PostgreSQL
+              Kiểm tra trực tiếp theo danh mục cửa hàng
             </span>
           </div>
 
@@ -465,37 +470,32 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
                         </span>
                       )}
 
-                      {/* Huy hiệu trạng thái khớp */}
                       {item.match_status === 'MATCHED' ? (
                         <Badge variant="success" size="sm">
-                          🔒 Khớp kho ({item.sku})
+                          Khớp kho ({item.sku})
                         </Badge>
                       ) : item.match_status === 'AMBIGUOUS' ? (
                         <Badge variant="uncertain" size="sm">
-                          ⚠️ Chưa rõ biến thể
-                        </Badge>
-                      ) : item.match_status === 'OUT_OF_STOCK' ? (
-                        <Badge variant="danger" size="sm">
-                          ✕ Hết hàng
+                          Chưa rõ biến thể
                         </Badge>
                       ) : (
                         <Badge variant="danger" size="sm">
-                          ✕ Chưa có trong kho
+                          Hết hàng hoặc chưa có
                         </Badge>
                       )}
                     </div>
 
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
-                      Đoạn chat: "{item.raw_text}"
+                      Đoạn tin: "{item.raw_text}"
                     </p>
 
                     {item.notes && (
                       <p className="text-xs text-amber-700 dark:text-amber-300 font-medium mt-1">
-                        👉 {item.notes}
+                        {item.notes}
                       </p>
                     )}
 
-                    {/* Danh sách lựa chọn biến thể nếu AMBIGUOUS */}
+                    {/* Lựa chọn biến thể thay thế nếu AMBIGUOUS */}
                     {item.match_status === 'AMBIGUOUS' && item.potential_matches && (
                       <div className="mt-2 space-y-1.5 pt-2 border-t border-amber-200 dark:border-amber-800">
                         <p className="text-[11px] font-bold text-amber-900 dark:text-amber-200">
@@ -507,9 +507,9 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
                               key={p.variant_id}
                               type="button"
                               onClick={() => handleSelectAlternativeVariant(idx, p)}
-                              className="px-2 py-1 rounded bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-xs hover:bg-amber-100 dark:hover:bg-amber-900 transition font-medium"
+                              className="px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-xs hover:bg-amber-100 dark:hover:bg-amber-900 transition font-medium text-slate-800 dark:text-slate-200"
                             >
-                              {p.variant_name} (Còn {p.stock} | {p.price_vnd.toLocaleString('vi-VN')} đ)
+                              {p.variant_name} (Còn {p.stock} | {p.price_vnd.toLocaleString('vi-VN')} ₫)
                             </button>
                           ))}
                         </div>
@@ -526,13 +526,13 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
                         min={1}
                         value={item.quantity}
                         onChange={(e) => handleQuantityChange(idx, Number(e.target.value))}
-                        className="w-14 text-center text-xs py-1 px-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold"
+                        className="w-14 text-center text-xs py-1 px-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold"
                       />
                     </div>
 
                     <div className="text-right min-w-[90px]">
                       {item.price_vnd ? (
-                        <div className="font-extrabold text-sm text-indigo-600 dark:text-indigo-400">
+                        <div className="font-extrabold text-sm text-indigo-600 dark:text-indigo-400 font-heading">
                           <MoneyText amount={item.price_vnd * item.quantity} />
                         </div>
                       ) : (
@@ -543,10 +543,11 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(idx)}
-                      className="text-slate-400 hover:text-rose-500 text-sm p-1"
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
                       title="Xóa món này"
+                      aria-label="Xóa món này"
                     >
-                      ✕
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -556,17 +557,17 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
         </div>
 
         {/* 7. Tài chính: Phí Ship & Giảm Giá */}
-        <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl space-y-2 text-xs">
+        <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2 text-xs">
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Phí vận chuyển (VND)"
+              label="Phí vận chuyển (₫)"
               type="number"
               min={0}
               value={shippingFee}
               onChange={(e) => setShippingFee(Number(e.target.value) || 0)}
             />
             <Input
-              label="Giảm giá voucher (VND)"
+              label="Giảm giá voucher (₫)"
               type="number"
               min={0}
               value={discount}
@@ -580,18 +581,18 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
               <MoneyText amount={subtotal} />
             </div>
             <div className="flex justify-between font-bold text-sm text-slate-900 dark:text-slate-100 pt-1">
-              <span>TỔNG THANH TOÁN (Trừ kho thực tế):</span>
-              <span className="text-base text-emerald-600 dark:text-emerald-400 font-extrabold">
+              <span>TỔNG THANH TOÁN:</span>
+              <span className="text-base text-emerald-600 dark:text-emerald-400 font-black font-heading">
                 <MoneyText amount={total} />
               </span>
             </div>
           </div>
         </div>
 
-        {/* 8. THANH HÀNH ĐỘNG DÍNH ĐÁY MÀN HÌNH (Sticky Bottom Action Bar) */}
+        {/* 8. Thanh hành động dính đáy */}
         <div className="sticky -bottom-6 -mx-6 -mb-6 p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg z-20">
           <div className="text-xs text-slate-500 hidden sm:block">
-            <span>Phím tắt: <b>Ctrl + Enter</b> để chốt đơn & trừ kho tức thì</span>
+            <span>Phím tắt: <b>Ctrl + Enter</b> để chốt đơn ngay</span>
           </div>
 
           <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
@@ -611,8 +612,10 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
               size="md"
               onClick={handleSaveAsDraft}
               disabled={isConfirming}
+              className="inline-flex items-center space-x-1"
             >
-              Lưu bản nháp
+              <Save className="w-4 h-4" />
+              <span>Lưu nháp</span>
             </Button>
 
             <Button
@@ -622,9 +625,10 @@ export const DraftOrderReviewModal: React.FC<DraftOrderReviewModalProps> = ({
               onClick={handleConfirmAndDeductStock}
               isLoading={isConfirming}
               disabled={isConfirming || isPromptInjection}
-              className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 font-bold px-5"
+              className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 font-bold px-5 inline-flex items-center space-x-1.5"
             >
-              ✓ Xác Nhận & Trừ Kho
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Chốt & Trừ kho</span>
             </Button>
           </div>
         </div>

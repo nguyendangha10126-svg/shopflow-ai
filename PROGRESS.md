@@ -13,8 +13,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | **U2** | **Hệ thống thiết kế (Design Tokens, Lucide)** | ✅ **HOÀN THÀNH** | `lucide-react`, `tailwind.config.js`, `index.html`, `Badge.tsx`, `EmptyState.tsx`, `Toast.tsx`, `AppLayout.tsx`, `DesignSystemShowcase.tsx`, `docs/contrast.md` | Kiểm tra typecheck, build 0 lỗi, đối soát `/styleguide` và `docs/contrast.md` | Không có lỗi. Sẵn sàng vào U3. |
 | **U3** | **App Shell & Điều hướng (Mobile + Desktop)** | ✅ **HOÀN THÀNH** | `Sidebar.tsx`, `Topbar.tsx`, `MobileBottomBar.tsx`, `CommandPalette.tsx`, `AppLayout.tsx` | Phím tắt Ctrl+K, responsive mobile 390px, FAB tím giữa, sidebar collapse | Không có lỗi. Sẵn sàng vào U4. |
 | **U4** | **Dán tin AI (1): Ingestion & Clipboard** | ✅ **HOÀN THÀNH** | `MessageIngestionModal.tsx`, `Modal.tsx` | Clipboard API fallback, 3 tin mẫu 1 chạm, đếm 2.000 ký tự, Lucide icons | Không có lỗi. Sẵn sàng vào U5. |
-| **U5** | **Dán tin AI (2): Trình duyệt đơn nháp** | ⏳ Đang thực hiện | - | Duyệt đơn nháp 3 phân loại, kiểm tra tô sáng nguồn | Chuyển sang U5 ngay. |
-| **U6** | **Quản lý Đơn hàng & Drawer thao tác nhanh** | ⏳ Chờ | - | Drawer chi tiết, sao chép tin nhắn Zalo, gọi khách | Chờ U5 |
+| **U5** | **Dán tin AI (2): Trình duyệt đơn nháp** | ✅ **HOÀN THÀNH** | `DraftOrderReviewModal.tsx` | Phân cấp 3 loại dữ liệu, tô sáng nguồn tin, sao chép câu hỏi khách, thanh hành động cố định | Không có lỗi. Sẵn sàng vào U6. |
+| **U6** | **Quản lý Đơn hàng & Drawer thao tác nhanh** | ⏳ Đang thực hiện | - | Drawer chi tiết, sao chép tin nhắn Zalo, gọi khách | Chuyển sang U6 ngay. |
 | **U7** | **Quản lý Sản phẩm (1): Lưới, Form, Undo** | ⏳ Chờ | - | Test thêm/sửa sản phẩm, xóa mềm có nút Hoàn tác | Chờ U6 |
 | **U8** | **Quản lý Sản phẩm (2): Tải ảnh & Storage** | ⏳ Chờ | - | Upload ảnh <5MB, client resize, ProductImage fallback | Chờ U7 |
 | **U9** | **Khách hàng & Hồ sơ chi tiết (CRM mini)** | ⏳ Chờ | - | Lịch sử đơn hàng của khách, nhãn Khách quen (>=3 đơn) | Chờ U8 |
@@ -108,3 +108,20 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
   5. **Quy trình phân tích thật minh bạch**:
      - Không tạo độ trễ giả mạo, hiển thị trạng thái thực tế kèm `aria-live="polite"` cho bộ đọc màn hình.
 - **Kiểm chứng**: `npm run lint` & `npm run build` đạt 100%.
+
+### Bước U5: Hoàn thiện Trình duyệt đơn nháp AI (Draft Order Review Modal)
+- **Thời gian**: 2026-10-21 21:47
+- **Công việc đã làm**:
+  1. **Phân cấp 3 tầng dữ liệu trực quan**:
+     - *Sự thật hệ thống (Truth)*: Tồn kho thực tế, SKU, đơn giá chuẩn từ danh mục - gắn huy hiệu Khiên xanh bảo vệ.
+     - *AI Gợi ý (AI Proposed)*: Tên khách hàng, SĐT, địa chỉ giao hàng trích xuất - gắn huy hiệu Tia sáng tím.
+     - *Cần hỏi lại / Nghi ngờ (Uncertain)*: Cảnh báo hàng thiếu biến thể (size/màu) hoặc cảnh báo prompt injection - gắn huy hiệu Cảnh báo hổ phách.
+  2. **Tô sáng nguồn tin tương tác 2 chiều (Source Highlighting)**:
+     - Khi rê chuột hoặc nhắm focus vào từng trường thông tin bên phải (khách, SĐT, địa chỉ, mặt hàng), đoạn tin nhắn gốc tương ứng bên trái sẽ tự động nổi bật nền tím/vàng và cuộn vào tầm nhìn.
+  3. **Sao chép câu hỏi khách 1 chạm**:
+     - Tự động tạo mẫu câu nhắn lịch sự cho shop: *"Dạ Shop May xin phép xác nhận lại size/màu..."*, nút bấm 1 chạm sao chép thẳng vào clipboard để gửi qua Zalo/Messenger kèm thông báo toast.
+  4. **Thanh hành động cố định đáy (Sticky Action Bar)**:
+     - 3 nút rõ ràng: "Bỏ qua" (thứ cấp), "Lưu nháp" (viền), "Chốt & Trừ kho" (chính - màu tím nổi bật), kèm trạng thái cảnh báo khi vượt tồn kho hoặc chưa chọn đủ phân loại.
+- **Kiểm chứng**:
+  - `npm run lint` và `npm run build` không còn lỗi TypeScript nào.
+
