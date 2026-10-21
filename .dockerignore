@@ -1,0 +1,34 @@
+# Phụ thuộc và thư mục tạm thời
+node_modules
+apps/*/node_modules
+dist
+apps/*/dist
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Biến môi trường nhạy cảm
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Quản lý phiên bản Git
+.git
+.gitignore
+.github
+
+# Báo cáo và kiểm thử
+coverage
+tests/reports
+*.test.ts
+*.spec.ts
+
+# Trình soạn thảo & Hệ điều hành
+.vscode
+.idea
+.gemini
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,105 @@
+version: '3.8'
+
+# ==============================================================================
+# SHOPFLOW AI - DOCKER COMPOSE ORCHESTRATION (PRODUCTION STACK)
+# Bao gồm 3 dịch vụ cốt lõi:
+# 1. postgres: Cơ sở dữ liệu PostgreSQL 16 Alpine với volume bền vững & healthcheck
+# 2. backend: Express API với Prisma ORM, JWT, Gemini Flash & healthcheck
+# 3. frontend: Nginx Alpine phân phối React Vite SPA & Reverse Proxy /api/
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. CƠ SỞ DỮ LIỆU POSTGRESQL 16
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: shopflow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shopflow_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shopflow_password}
+      POSTGRES_DB: ${POSTGRES_DB:-shopflow_db}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-shopflow_user} -d ${POSTGRES_DB:-shopflow_db}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shopflow_network
+
+  # ----------------------------------------------------------------------------
+  # 2. MÁY CHỦ API BACKEND (EXPRESS NODE.JS)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: shopflow_backend
+    restart: unless-stopped
+    ports:
+      - '${BACKEND_PORT:-5000}:5000'
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-shopflow_user}:${POSTGRES_PASSWORD:-shopflow_password}@postgres:5432/${POSTGRES_DB:-shopflow_db}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-shopflow_super_secret_jwt_key_2026_change_in_production_min32chars}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-8000}
+      AI_MAX_RETRIES: ${AI_MAX_RETRIES:-1}
+      AI_TEMPERATURE: ${AI_TEMPERATURE:-0.1}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:5000/healthz || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - shopflow_network
+
+  # ----------------------------------------------------------------------------
+  # 3. GIAO DIỆN NGƯỜI DÙNG FRONTEND (REACT VITE + NGINX PROXY)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: shopflow_frontend
+    restart: unless-stopped
+    ports:
+      - '${FRONTEND_PORT:-80}:80'
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:80/healthz || exit 1']
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - shopflow_network
+
+# ------------------------------------------------------------------------------
+# VOLUMES & NETWORKS BỀN VỮNG
+# ------------------------------------------------------------------------------
+volumes:
+  postgres_data:
+    name: shopflow_postgres_data
+
+networks:
+  shopflow_network:
+    name: shopflow_network
+    driver: bridge

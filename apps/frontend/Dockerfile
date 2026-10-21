@@ -1,0 +1,49 @@
+# ==============================================================================
+# SHOPFLOW AI - DOCKERFILE FRONTEND (MULTI-STAGE REACT VITE + NGINX ALPINE)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# GIAI ĐOẠN 1: BUILDER (Biên dịch React Vite SPA & TailwindCSS)
+# ------------------------------------------------------------------------------
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Sao chép manifest Monorepo và package.json frontend
+COPY package*.json ./
+COPY apps/frontend/package*.json ./apps/frontend/
+COPY apps/backend/package*.json ./apps/backend/
+
+# Cài đặt dependencies
+RUN npm ci
+
+# Sao chép toàn bộ mã nguồn Frontend
+COPY apps/frontend ./apps/frontend/
+
+# Biên dịch giao diện tĩnh ra thư mục apps/frontend/dist/
+RUN npm run build --workspace=apps/frontend
+
+# ------------------------------------------------------------------------------
+# GIAI ĐOẠN 2: RUNNER (Nginx Alpine Web Server Siêu Tốc & Reverse Proxy)
+# ------------------------------------------------------------------------------
+FROM nginx:1.25-alpine AS runner
+
+# Cài đặt curl phục vụ container healthcheck
+RUN apk add --no-cache curl
+
+# Sao chép file cấu hình Nginx tối ưu cho SPA & Reverse Proxy
+COPY apps/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Sao chép các tệp tĩnh đã build từ builder sang thư mục phục vụ web của Nginx
+COPY --from=builder /app/apps/frontend/dist /usr/share/nginx/html
+
+# Mở cổng HTTP 80
+EXPOSE 80
+
+# Healthcheck kiểm tra định kỳ 15 giây
+HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:80/healthz || exit 1
+
+# Khởi chạy máy chủ Nginx ở chế độ foreground
+CMD ["nginx", "-g", "daemon off;"]
+

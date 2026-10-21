@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ShopFlow AI - Trợ lý Chốt đơn & Tồn kho</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <span style="font-size: 1.4rem;">🛍️</span>
+        <div>
+          <h1>ShopFlow AI</h1>
+        </div>
+        <span class="badge-ai">Flash 1.5</span>
+      </div>
+      <div class="user-badge" id="userBadge">
+        👤 Đang tải...
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-bar">
+      <button class="tab-btn active" data-tab="tab-inbox">
+        <span>⚡</span> AI Inbox
+      </button>
+      <button class="tab-btn" data-tab="tab-orders">
+        <span>📦</span> Đơn hàng
+      </button>
+      <button class="tab-btn" data-tab="tab-inventory">
+        <span>🏷️</span> Kho hàng
+      </button>
+      <button class="tab-btn" data-tab="tab-faq">
+        <span>💬</span> FAQ Bot
+      </button>
+      <button class="tab-btn" data-tab="tab-reports">
+        <span>📊</span> Báo cáo
+      </button>
+    </nav>
+
+    <!-- Main Content Screens -->
+    <main>
+      <!-- SCREEN 1: AI INBOX (PASTE SCREEN) -->
+      <section id="tab-inbox" class="screen active">
+        <!-- Vùng nhập tin nhắn (Paste Area) -->
+        <div id="pasteStep" class="card">
+          <div class="card-title">
+            <span>📋</span> Dán tin nhắn đặt hàng của khách
+          </div>
+
+          <textarea 
+            id="rawMessage" 
+            class="paste-box" 
+            placeholder="Dán tin nhắn Zalo / Facebook Messenger vào đây...&#10;VD: Cho chị 1 áo sơ mi lụa trắng size M với 1 chân váy xếp ly đen size S về 124 Trần Hưng Đạo Q1 nhé e, sđt 0903123456"
+          ></textarea>
+
+          <div class="input-toolbar">
+            <button id="btnPasteClipboard" type="button" class="btn-secondary-sm">
+              📋 Dán từ Clipboard
+            </button>
+            <span id="charCount">0/2000 ký tự</span>
+          </div>
+
+          <!-- Mẫu thử nhanh (Quick Sample Chips) -->
+          <div style="margin-top: 14px;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">
+              💡 Tin nhắn mẫu để thử nghiệm nhanh:
+            </div>
+            <div class="chips-container">
+              <button type="button" class="chip" data-sample="sample1">
+                1 Áo sơ mi trắng M + SĐT
+              </button>
+              <button type="button" class="chip" data-sample="sample2">
+                Đổi ý đổi size (Temporal)
+              </button>
+              <button type="button" class="chip" data-sample="sample3">
+                Đặt 2 món khác nhau
+              </button>
+              <button type="button" class="chip" data-sample="sample4">
+                Mặt hàng hết kho (Out of stock)
+              </button>
+            </div>
+          </div>
+
+          <button id="btnExtractAI" type="button" class="btn-primary" style="margin-top: 10px;">
+            <span id="btnExtractIcon">⚡</span>
+            <span id="btnExtractText">Phân tích đơn hàng (AI Extract)</span>
+          </button>
+        </div>
+
+        <!-- Vùng xem xét và chỉnh sửa đơn nháp (Review Draft Screen) -->
+        <div id="reviewStep" style="display: none;">
+          <!-- Banner Độ tin cậy AI -->
+          <div class="card" style="background: rgba(124, 58, 237, 0.1); border-color: var(--primary);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span class="badge-ai" id="aiModelBadge">Gemini 1.5 Flash</span>
+                <span style="font-size: 0.8rem; font-weight: 600; margin-left: 6px;">Đơn hàng nháp</span>
+              </div>
+              <span class="badge-ai" id="confidenceBadge">Độ tin cậy: 95%</span>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
+              🔒 Giá bán và tồn kho được lấy trực tiếp từ CSDL cửa hàng. Vui lòng đối soát trước khi chốt.
+            </div>
+          </div>
+
+          <!-- Thông tin Khách hàng -->
+          <div class="card">
+            <div class="card-title">
+              <span>👤</span> Thông tin khách hàng (PII)
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted);">Họ và tên:</label>
+                <input type="text" id="custName" class="paste-box" style="min-height: 38px; padding: 8px;">
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted);">Số điện thoại nhận hàng:</label>
+                <input type="text" id="custPhone" class="paste-box" style="min-height: 38px; padding: 8px;">
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted);">Địa chỉ giao hàng:</label>
+                <textarea id="custAddress" class="paste-box" style="min-height: 60px; padding: 8px;"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Danh sách Sản phẩm trích xuất được -->
+          <div class="card">
+            <div class="card-title">
+              <span>📦</span> Sản phẩm trong đơn (<span id="itemCount">0</span>)
+            </div>
+            <div id="itemsContainer">
+              <!-- Render động các sản phẩm -->
+            </div>
+          </div>
+
+          <!-- Tính tiền & Chi phí -->
+          <div class="card">
+            <div class="card-title">
+              <span>💰</span> Chi phí & Thanh toán
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.85rem;">
+              <span style="color: var(--text-muted);">Tiền hàng:</span>
+              <span id="lblSubtotal" style="font-weight: 600;">0 đ</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.85rem;">
+              <span style="color: var(--text-muted);">Phí giao hàng:</span>
+              <input type="number" id="inputShippingFee" value="30000" style="width: 100px; text-align: right; background: #0b1120; border: 1px solid var(--border); color: #fff; padding: 4px; border-radius: 4px;">
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.85rem;">
+              <span style="color: var(--text-muted);">Giảm giá:</span>
+              <input type="number" id="inputDiscount" value="0" style="width: 100px; text-align: right; background: #0b1120; border: 1px solid var(--border); color: #fff; padding: 4px; border-radius: 4px;">
+            </div>
+            <hr style="border-color: var(--border); margin: 8px 0;">
+            <div style="display: flex; justify-content: space-between; font-size: 1.05rem; font-weight: 700;">
+              <span>Tổng thanh toán COD:</span>
+              <span id="lblTotal" style="color: #34d399;">0 đ</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 2: DANH SÁCH ĐƠN HÀNG -->
+      <section id="tab-orders" class="screen">
+        <div class="card">
+          <div class="card-title">
+            <span>📦</span> Danh sách đơn hàng gần đây
+          </div>
+          <div id="ordersListContainer">
+            <div style="text-align: center; color: var(--text-muted); padding: 20px;">
+              Đang tải danh sách đơn hàng...
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 3: QUẢN LÝ KHO HÀNG -->
+      <section id="tab-inventory" class="screen">
+        <div class="card">
+          <div class="card-title">
+            <span>🏷️</span> Quản lý Tồn kho Tức thì
+          </div>
+          <div id="inventoryContainer">
+            <div style="text-align: center; color: var(--text-muted); padding: 20px;">
+              Đang tải danh mục kho hàng...
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 4: HỎI ĐÁP CHÍNH SÁCH FAQ (RAG MODULE) -->
+      <section id="tab-faq" class="screen">
+        <div class="card">
+          <div class="card-title">
+            <span>💬</span> Trợ lý Trả lời FAQ theo Quy định Shop
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
+            Hệ thống tự động tra cứu chính sách và bảng size của shop để trả lời khách hàng nhanh chóng, không bịa đặt.
+          </div>
+          <textarea id="faqQuestionInput" class="paste-box" style="min-height: 80px;" placeholder="Nhập câu hỏi của khách (VD: Shop cho em hỏi đổi size thế nào? Khách 1m58 48kg mặc vừa size gì?)"></textarea>
+          <button id="btnAskFaq" type="button" class="btn-primary" style="margin-top: 10px;">
+            <span>🤖</span> Hỏi AI Trả lời
+          </button>
+          <div id="faqAnswerResult" style="display: none; margin-top: 14px; background: #0b1120; border: 1px dashed var(--border); border-radius: 8px; padding: 12px; font-size: 0.85rem;">
+            <div style="color: #c084fc; font-weight: 600; margin-bottom: 4px;">Câu trả lời gợi ý:</div>
+            <div id="faqAnswerText" style="color: #e2e8f0; line-height: 1.5;"></div>
+            <button id="btnCopyFaqAnswer" type="button" class="btn-secondary-sm" style="margin-top: 8px;">
+              📋 Sao chép câu trả lời
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 5: BÁO CÁO DOANH THU & HẠN MỨC (REPORTS & USAGE) -->
+      <section id="tab-reports" class="screen">
+        <!-- Hạn mức gói cước AI -->
+        <div class="card">
+          <div class="card-title">
+            <span>⚡</span> Hạn mức Dùng AI Tháng này
+          </div>
+          <div id="usageStatsContainer">
+            <div style="text-align: center; color: var(--text-muted);">Đang tải thông số gói...</div>
+          </div>
+        </div>
+
+        <!-- Doanh thu 30 ngày (Chỉ OWNER) -->
+        <div class="card" id="revenueCard">
+          <div class="card-title">
+            <span>💰</span> Doanh thu Đơn hàng Đã giao (30 ngày)
+          </div>
+          <div id="revenueContainer">
+            <div style="text-align: center; color: var(--text-muted);">Đang tải doanh thu...</div>
+          </div>
+        </div>
+
+        <!-- Cảnh báo Tồn kho thấp -->
+        <div class="card">
+          <div class="card-title" style="color: #f59e0b;">
+            <span>⚠️</span> Cảnh báo Mặt hàng Sắp hết kho
+          </div>
+          <div id="lowStockContainer">
+            <div style="text-align: center; color: var(--text-muted);">Đang kiểm tra tồn...</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Sticky Bottom Action Bar (Xuất hiện khi đang ở Review Screen) -->
+    <div id="stickyBottomBar" class="bottom-bar" style="display: none;">
+      <div class="bottom-bar-inner">
+        <button id="btnBackToPaste" type="button" class="btn-secondary">
+          ↩ Làm lại
+        </button>
+        <button id="btnConfirmCheckout" type="button" class="btn-primary" style="flex: 2;">
+          <span id="btnCheckoutIcon">🚀</span>
+          <span id="btnCheckoutText">Xác nhận chốt đơn</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- MODAL THÀNH CÔNG & 1-TAP COPY TIN NHẮN GỬI KHÁCH -->
+    <div id="successModal" class="modal-overlay">
+      <div class="modal-content">
+        <div style="font-size: 3rem; margin-bottom: 8px;">🎉</div>
+        <h2 style="font-size: 1.25rem; font-weight: 700; color: #fff;">Chốt đơn thành công!</h2>
+        <div style="margin: 6px 0; font-size: 0.9rem; color: #cbd5e1;">
+          Mã đơn hàng: <strong id="modalOrderNumber" style="color: #c084fc; font-size: 1.1rem;">#1001</strong>
+        </div>
+        <div style="font-size: 0.75rem; color: #10b981;">
+          ✓ Tồn kho đã được trừ nguyên tử trong CSDL
+        </div>
+
+        <div class="bill-preview" id="billPreviewText">
+          <!-- Text hóa đơn mẫu gửi khách -->
+        </div>
+
+        <button id="btnCopyBill" type="button" class="btn-primary" style="background: linear-gradient(135deg, #059669, #10b981);">
+          📋 1-Tap Copy tin nhắn gửi khách
+        </button>
+        <button id="btnCloseModal" type="button" class="btn-secondary" style="width: 100%; margin-top: 8px;">
+          Tạo đơn mới tiếp theo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
+

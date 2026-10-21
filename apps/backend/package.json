@@ -1,0 +1,52 @@
+{
+  "name": "@shopflow/backend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "lint": "tsc --noEmit",
+    "prisma:generate": "prisma generate --schema=../../prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema=../../prisma/schema.prisma",
+    "prisma:seed": "ts-node ../../prisma/seed.ts",
+    "test:c3": "ts-node tests/test-c3-foundation.ts",
+    "test:c4": "ts-node tests/test-c4-auth.ts",
+    "test:c5": "ts-node tests/test-c5-catalog-customer.ts",
+    "test:c6": "ts-node tests/test-c6-orders-concurrency.ts",
+    "test:c9": "ts-node tests/test-c9-ai-backend.ts",
+    "test:c10": "ts-node tests/test-c10-gemini-provider.ts",
+    "test:c14": "ts-node tests/test-c14-dashboard.ts",
+    "test:c15": "ts-node tests/test-c15-rag-faq.ts",
+    "test:c16": "ts-node tests/test-c16-docker-deploy.ts",
+    "test:c17": "ts-node tests/test-c17-e2e-integration.ts",
+    "test:eval": "ts-node tests/eval-ai-benchmark.ts"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/client": "^5.14.0",
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^9.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.11.0",
+    "@types/supertest": "^6.0.2",
+    "pino-pretty": "^11.0.0",
+    "prisma": "^5.14.0",
+    "supertest": "^7.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

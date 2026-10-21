@@ -1,0 +1,54 @@
+{
+  "name": "shopflow-ai-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ShopFlow AI - Monorepo (Express Backend + React Vite Frontend)",
+  "workspaces": [
+    "apps/backend",
+    "apps/frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "dev:frontend": "npm run dev --workspace=apps/frontend",
+    "build:backend": "npm run build --workspace=apps/backend",
+    "build:frontend": "npm run build --workspace=apps/frontend",
+    "build": "npm run build:backend && npm run build:frontend",
+    "lint": "npm run lint --workspace=apps/backend && npm run lint --workspace=apps/frontend",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
+    "prisma:deploy": "prisma migrate deploy --schema=prisma/schema.prisma",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:studio": "prisma studio --schema=prisma/schema.prisma",
+    "test:db": "ts-node tests/test-db-constraints.ts",
+    "test:c3": "npm run test:c3 --workspace=apps/backend",
+    "test:c4": "npm run test:c4 --workspace=apps/backend",
+    "test:c5": "npm run test:c5 --workspace=apps/backend",
+    "test:c6": "npm run test:c6 --workspace=apps/backend",
+    "test:c9": "npm run test:c9 --workspace=apps/backend",
+    "test:c10": "npm run test:c10 --workspace=apps/backend",
+    "test:c14": "npm run test:c14 --workspace=apps/backend",
+    "test:c15": "npm run test:c15 --workspace=apps/backend",
+    "test:c16": "npm run test:c16 --workspace=apps/backend",
+    "test:c17": "npm run test:c17 --workspace=apps/backend",
+    "test:all": "ts-node --transpile-only scripts/run-all-tests.ts",
+    "test:eval": "npm run test:eval --workspace=apps/backend",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@prisma/client": "^5.14.0",
+    "@types/bcrypt": "^5.0.2",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/node": "^20.11.0",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.5",
+    "prettier": "^3.2.5",
+    "prisma": "^5.14.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7"
+  }
+}

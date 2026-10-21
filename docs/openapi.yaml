@@ -1,0 +1,1250 @@
+openapi: 3.0.3
+info:
+  title: ShopFlow AI API Specification
+  description: |
+    API Contract cho hệ thống ShopFlow AI - Trợ lý chốt đơn và quản lý tồn kho cho shop online.
+    **Giả định: schema DB chưa được kiểm chứng bằng chạy thật.**
+    Tuân thủ nghiêm ngặt chuẩn RESTful, multi-tenant cách ly bằng shop_id từ JWT, và chuẩn lỗi thống nhất.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Máy chủ phát triển cục bộ (Local Development)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Gửi Access Token (hạn 15 phút) trong header Authorization.
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: Refresh Token lưu trong HttpOnly Secure Cookie (hạn 7 ngày).
+
+  schemas:
+    # ----------------- CHUẨN LỖI THỐNG NHẤT -----------------
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: "PRODUCT_NOT_FOUND"
+            message:
+              type: string
+              example: "Không tìm thấy sản phẩm trong cửa hàng của bạn."
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    example: "sku"
+                  issue:
+                    type: string
+                    example: "Mã SKU này đã tồn tại trong shop."
+
+    # ----------------- SCHEMAS: AUTH & USER -----------------
+    UserDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [OWNER, STAFF]
+        shop_id:
+          type: string
+          format: uuid
+        shop_name:
+          type: string
+
+    # ----------------- SCHEMAS: PRODUCTS -----------------
+    ProductVariantDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+          example: "SOMI-LUA-TRANG-M"
+        variant_name:
+          type: string
+          example: "Áo sơ mi lụa trắng dài tay (M)"
+        size:
+          type: string
+          nullable: true
+          example: "M"
+        color:
+          type: string
+          nullable: true
+          example: "Trắng"
+        price_vnd:
+          type: integer
+          example: 250000
+        stock:
+          type: integer
+          example: 10
+        low_stock_threshold:
+          type: integer
+          example: 3
+        is_active:
+          type: boolean
+
+    ProductDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Áo sơ mi lụa trắng dài tay"
+        category:
+          type: string
+          nullable: true
+          example: "Thời trang nữ"
+        description:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductVariantDto'
+        created_at:
+          type: string
+          format: date-time
+
+    # ----------------- SCHEMAS: CUSTOMERS -----------------
+    CustomerDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Nguyễn Phương Lan"
+        phone:
+          type: string
+          example: "0903123456"
+        address:
+          type: string
+          nullable: true
+          example: "45 Lê Lợi, P. Bến Nghé, Quận 1, TP.HCM"
+        total_orders:
+          type: integer
+          example: 5
+        total_spent_vnd:
+          type: string
+          description: BigInt serialize dưới dạng chuỗi để chống tràn số
+          example: "1250000"
+        notes:
+          type: string
+          nullable: true
+
+    # ----------------- SCHEMAS: ORDERS -----------------
+    OrderItemDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        product_variant_id:
+          type: string
+          format: uuid
+        snap_product_name:
+          type: string
+          example: "Áo sơ mi lụa trắng dài tay (M)"
+        snap_variant_name:
+          type: string
+          example: "M"
+        snap_sku:
+          type: string
+          example: "SOMI-LUA-TRANG-M"
+        snap_price_vnd:
+          type: integer
+          example: 250000
+        quantity:
+          type: integer
+          example: 1
+        subtotal_vnd:
+          type: integer
+          example: 250000
+
+    OrderStatusHistoryDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        from_status:
+          type: string
+          example: "PENDING_REVIEW"
+        to_status:
+          type: string
+          example: "CONFIRMED"
+        changed_by_name:
+          type: string
+          example: "Nguyễn Thùy Linh"
+        reason:
+          type: string
+          nullable: true
+          example: "Chủ shop bấm duyệt đơn"
+        created_at:
+          type: string
+          format: date-time
+
+    OrderDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_number:
+          type: integer
+          example: 1005
+        display_code:
+          type: string
+          example: "#1005"
+        customer_id:
+          type: string
+          format: uuid
+          nullable: true
+        customer_name:
+          type: string
+          example: "Nguyễn Phương Lan"
+        customer_phone:
+          type: string
+          example: "0903123456"
+        shipping_address:
+          type: string
+          example: "45 Lê Lợi, P. Bến Nghé, Quận 1, TP.HCM"
+        status:
+          type: string
+          enum: [DRAFT, PENDING_REVIEW, CONFIRMED, SHIPPING, DELIVERED, CANCELLED, RETURNED]
+          example: "CONFIRMED"
+        source:
+          type: string
+          enum: [CLIPBOARD, MANUAL]
+          example: "CLIPBOARD"
+        subtotal_vnd:
+          type: integer
+          example: 250000
+        shipping_fee_vnd:
+          type: integer
+          example: 20000
+        discount_vnd:
+          type: integer
+          example: 0
+        total_vnd:
+          type: integer
+          example: 270000
+        notes:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemDto'
+        status_history:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderStatusHistoryDto'
+        created_at:
+          type: string
+          format: date-time
+
+    CreateManualOrderRequest:
+      type: object
+      required:
+        - customer_name
+        - customer_phone
+        - shipping_address
+        - items
+      properties:
+        customer_name:
+          type: string
+          example: "Nguyễn Phương Lan"
+        customer_phone:
+          type: string
+          example: "0903123456"
+        shipping_address:
+          type: string
+          example: "45 Lê Lợi, P. Bến Nghé, Quận 1, TP.HCM"
+        shipping_fee_vnd:
+          type: integer
+          default: 0
+          example: 20000
+        discount_vnd:
+          type: integer
+          default: 0
+          example: 0
+        notes:
+          type: string
+          nullable: true
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [product_variant_id, quantity]
+            properties:
+              product_variant_id:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+                minimum: 1
+                example: 1
+
+    # ----------------- SCHEMAS: AI DRAFT & FAQ (G10c) -----------------
+    ExtractDraftOrderRequest:
+      type: object
+      required:
+        - message
+        - source
+      properties:
+        message:
+          type: string
+          minLength: 5
+          maxLength: 2000
+          description: "Chuỗi văn bản tin nhắn của khách chốt đơn (tối đa 2.000 ký tự)"
+          example: "Ship cho mình 1 áo sơ mi lụa trắng size M về số 45 Lê Lợi, P. Bến Nghé, Q1, HCM, SĐT 0903123456 nhé"
+        source:
+          type: string
+          enum: [clipboard, manual]
+          example: "clipboard"
+        customer_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    DraftOrderItemResult:
+      type: object
+      properties:
+        product_variant_id:
+          type: string
+          format: uuid
+          nullable: true
+        matched_sku:
+          type: string
+          nullable: true
+          example: "SOMI-LUA-TRANG-M"
+        product_name:
+          type: string
+          example: "Áo sơ mi lụa trắng dài tay"
+        variant_size:
+          type: string
+          nullable: true
+          example: "M"
+        variant_color:
+          type: string
+          nullable: true
+          example: "Trắng"
+        quantity:
+          type: integer
+          example: 1
+        unit_price_vnd:
+          type: integer
+          description: "Đơn giá niêm yết do CSDL cung cấp (source_of_truth: system)"
+          example: 250000
+        stock_available:
+          type: integer
+          description: "Tồn kho thực tế (source_of_truth: system)"
+          example: 5
+        match_status:
+          type: string
+          enum: [matched, ambiguous, not_found]
+          example: "matched"
+        source_of_truth:
+          type: string
+          enum: [system, ai_suggestion]
+          example: "system"
+
+    DraftOrderResponse:
+      type: object
+      properties:
+        draft_order_id:
+          type: string
+          format: uuid
+        customer_name:
+          type: string
+          example: "Khách hàng"
+        customer_phone:
+          type: string
+          nullable: true
+          example: "0903123456"
+        shipping_address:
+          type: string
+          nullable: true
+          example: "45 Lê Lợi, P. Bến Nghé, Q1, HCM"
+        subtotal_vnd:
+          type: integer
+          example: 250000
+        shipping_fee_vnd:
+          type: integer
+          example: 20000
+        total_vnd:
+          type: integer
+          example: 270000
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DraftOrderItemResult'
+        confidence_score:
+          type: number
+          format: float
+          example: 0.95
+        needs_clarification:
+          type: boolean
+          example: false
+        warning_flags:
+          type: array
+          items:
+            type: string
+          example: []
+        questions_for_staff:
+          type: array
+          items:
+            type: string
+          example: []
+
+    AskFaqRequest:
+      type: object
+      required:
+        - question
+      properties:
+        question:
+          type: string
+          maxLength: 500
+          example: "Shop có cho xem hàng trước không và phí đổi size thế nào?"
+
+    AskFaqResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+          example: "Dạ shop mình có hỗ trợ kiểm tra hàng trước khi nhận ạ. Chị được đổi size trong 3 ngày, phí ship đổi 2 chiều khách hỗ trợ 30k giúp shop nhé!"
+        confidence:
+          type: number
+          example: 0.92
+        sources:
+          type: array
+          items:
+            type: string
+          example: ["Chính sách Bán hàng & Đổi trả Shop Mây (Đoạn 0 & 1)"]
+
+    UsageReportResponse:
+      type: object
+      properties:
+        shop_id:
+          type: string
+          format: uuid
+        plan_code:
+          type: string
+          example: "BASIC"
+        period_month:
+          type: string
+          example: "2026-10"
+        ai_draft_orders:
+          type: object
+          properties:
+            used: { type: integer, example: 245 }
+            limit: { type: integer, example: 300 }
+            percentage: { type: number, example: 81.6 }
+        ai_faq_queries:
+          type: object
+          properties:
+            used: { type: integer, example: 85 }
+            limit: { type: integer, example: 300 }
+            percentage: { type: number, example: 28.3 }
+        average_latency_ms:
+          type: integer
+          example: 1850
+
+paths:
+  # =========================================================
+  # NHÓM 1: XÁC THỰC & TÀI KHOẢN (/auth)
+  # =========================================================
+  /auth/register:
+    post:
+      summary: Đăng ký cửa hàng mới và tài khoản Chủ shop (Owner)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shop_name, shop_phone, full_name, email, password]
+              properties:
+                shop_name: { type: string, example: "Mây Boutique" }
+                shop_phone: { type: string, example: "0903123456" }
+                full_name: { type: string, example: "Nguyễn Thùy Linh" }
+                email: { type: string, format: email, example: "owner@mayboutique.vn" }
+                password: { type: string, format: password, minLength: 8, example: "ShopFlow@123" }
+      responses:
+        '201':
+          description: Đăng ký thành công, tự động đăng nhập
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  user: { $ref: '#/components/schemas/UserDto' }
+        '400':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Email đã tồn tại
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /auth/login:
+    post:
+      summary: Đăng nhập vào hệ thống
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: "owner@mayboutique.vn" }
+                password: { type: string, format: password, example: "ShopFlow@123" }
+      responses:
+        '200':
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  user: { $ref: '#/components/schemas/UserDto' }
+        '401':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /auth/refresh:
+    post:
+      summary: Cấp lại Access Token mới từ Refresh Token trong Cookie
+      tags: [Auth]
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+        '401':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /auth/me:
+    get:
+      summary: Lấy thông tin tài khoản hiện tại và shop sở hữu
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDto' }
+        '401':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /auth/logout:
+    post:
+      summary: Đăng xuất và xóa Refresh Token Cookie
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Đăng xuất thành công
+
+  # =========================================================
+  # NHÓM 2: SẢN PHẨM & BIẾN THỂ TỒN KHO (/products)
+  # =========================================================
+  /products:
+    get:
+      summary: Lấy danh sách sản phẩm của shop (có phân trang & tìm kiếm)
+      tags: [Products]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: low_stock_only
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductDto' }
+                  pagination:
+                    type: object
+                    properties:
+                      page: { type: integer }
+                      limit: { type: integer }
+                      total_items: { type: integer }
+                      total_pages: { type: integer }
+
+    post:
+      summary: Thêm sản phẩm mới kèm các biến thể (Chỉ Owner & Staff)
+      tags: [Products]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, variants]
+              properties:
+                name: { type: string, example: "Áo sơ mi lụa trắng dài tay" }
+                category: { type: string, example: "Thời trang nữ" }
+                description: { type: string }
+                variants:
+                  type: array
+                  items:
+                    type: object
+                    required: [sku, price_vnd, stock]
+                    properties:
+                      sku: { type: string, example: "SOMI-LUA-TRANG-S" }
+                      size: { type: string, example: "S" }
+                      color: { type: string, example: "Trắng" }
+                      price_vnd: { type: integer, minimum: 0, example: 250000 }
+                      stock: { type: integer, minimum: 0, example: 10 }
+                      low_stock_threshold: { type: integer, default: 3 }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductDto' }
+        '400':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /products/{id}:
+    get:
+      summary: Xem chi tiết 1 sản phẩm kèm toàn bộ biến thể tồn kho
+      tags: [Products]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductDto' }
+        '404':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+    delete:
+      summary: Xóa mềm sản phẩm (Chỉ Chủ shop - OWNER)
+      tags: [Products]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Đã xóa mềm thành công
+        '403':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /products/variants/{id}/stock:
+    patch:
+      summary: Cập nhật nhanh số lượng tồn kho của biến thể (+/- kiểm kho)
+      tags: [Products]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [change_amount]
+              properties:
+                change_amount: { type: integer, example: 1 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductVariantDto' }
+        '400':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # =========================================================
+  # NHÓM 3: KHÁCH HÀNG (/customers)
+  # =========================================================
+  /customers:
+    get:
+      summary: Lấy danh sách khách hàng của shop (Có che PII số điện thoại)
+      tags: [Customers]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/CustomerDto' }
+
+  /customers/{id}:
+    get:
+      summary: Xem chi tiết 1 khách hàng (Hiển thị đầy đủ PII phục vụ liên hệ)
+      tags: [Customers]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerDto' }
+        '404':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /customers/{id}/anonymize:
+    post:
+      summary: Xóa định danh dữ liệu cá nhân theo Nghị định 13/2023/NĐ-CP (Chỉ OWNER)
+      tags: [Customers]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+
+  # =========================================================
+  # NHÓM 4: QUẢN LÝ ĐƠN HÀNG (/orders)
+  # =========================================================
+  /orders:
+    get:
+      summary: Lấy danh sách đơn hàng của shop (Phân trang, lọc trạng thái, tìm kiếm)
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, PENDING_REVIEW, CONFIRMED, SHIPPING, DELIVERED, CANCELLED, RETURNED]
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/OrderDto' }
+                  pagination:
+                    type: object
+                    properties:
+                      page: { type: integer }
+                      limit: { type: integer }
+                      total_items: { type: integer }
+                      total_pages: { type: integer }
+
+    post:
+      summary: Tạo đơn hàng thủ công (Manual Order Creation)
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateManualOrderRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderDto' }
+        '400':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /orders/{id}:
+    get:
+      summary: Xem chi tiết 1 đơn hàng (Bao gồm lịch sử trạng thái và siêu dữ liệu AI)
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderDto' }
+        '404':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /orders/{id}/confirm:
+    post:
+      summary: Duyệt đơn nháp & Trừ tồn kho nguyên tử (1 Chạm)
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderDto' }
+        '400':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: Kho không đủ hàng hoặc Idempotency Key đang xử lý
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /orders/{id}/cancel:
+    post:
+      summary: Hủy đơn hàng và Hoàn tồn kho tự động
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, example: "Khách đổi ý không muốn lấy nữa" }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderDto' }
+        '400':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /orders/{id}/status:
+    patch:
+      summary: Cập nhật trạng thái giao hàng của đơn (SHIPPING, DELIVERED, RETURNED)
+      tags: [Orders]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [SHIPPING, DELIVERED, RETURNED]
+                  example: "SHIPPING"
+                notes:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderDto' }
+        '400':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # =========================================================
+  # NHÓM 5: TRÍ TUỆ NHÂN TẠO AI (/ai) - BỔ SUNG G10c
+  # =========================================================
+  /ai/draft-order:
+    post:
+      summary: Bóc tách tin nhắn khách hàng thành Đơn Nháp có cấu trúc (AI Engine)
+      description: |
+        Endpoint cốt lõi của ShopFlow AI:
+        - Nhận tin nhắn chat từ clipboard hoặc nhập tay (tối đa 2.000 ký tự).
+        - Gọi Gemini Flash qua AIProvider, đối chiếu tồn kho và giá niêm yết CSDL.
+        - Trả về Đơn Nháp ở trạng thái `PENDING_REVIEW` kèm cờ cảnh báo.
+        - **Rate Limit:** Tối đa 5 req/phút/user và giới hạn theo hạn mức tháng của gói cước.
+      tags: [AI Engine]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Chống gửi trùng lặp đoạn chat khi bấm 2 lần
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtractDraftOrderRequest'
+      responses:
+        '201':
+          description: Bóc tách đơn nháp thành công
+          headers:
+            RateLimit-Limit:
+              schema: { type: integer, example: 5 }
+            RateLimit-Remaining:
+              schema: { type: integer, example: 4 }
+            RateLimit-Reset:
+              schema: { type: integer, example: 60 }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftOrderResponse'
+        '400':
+          description: Tin nhắn quá dài (> 2000 ký tự) hoặc chuỗi rỗng
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '422':
+          description: AI trả về JSON sai cấu trúc sau 1 lần thử lại (Không bóc tách được)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429':
+          description: Chạm trần hạn mức AI của gói cước hoặc giới hạn tốc độ (Too Many Requests)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '503':
+          description: Dịch vụ Google AI gặp sự cố hoặc timeout quá 8 giây (Gợi ý chuyển sang điền tay)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /ai/faq-answer:
+    post:
+      summary: Hỏi đáp nhanh chính sách shop bằng RAG (Postgres Full-Text + Gemini)
+      tags: [AI Engine]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AskFaqRequest'
+      responses:
+        '200':
+          description: Câu trả lời đề xuất kèm nguồn trích dẫn
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AskFaqResponse'
+        '429':
+          description: Hết hạn mức gọi FAQ trong tháng
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '503':
+          description: AI đang bận
+
+  /faq-documents:
+    get:
+      summary: Lấy danh sách tài liệu chính sách của shop
+      tags: [AI Engine]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    title: { type: string, example: "Chính sách đổi trả và freeship" }
+                    content_type: { type: string, example: "POLICIES" }
+                    is_active: { type: boolean }
+
+    post:
+      summary: Tải lên tài liệu chính sách shop mới (Tự động băm Chunks & Full-text)
+      tags: [AI Engine]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, raw_text]
+              properties:
+                title: { type: string, example: "Chính sách Bán hàng & Đổi trả Shop Mây" }
+                raw_text: { type: string, example: "Khách được kiểm hàng trước, đổi size trong 3 ngày..." }
+      responses:
+        '201':
+          description: Tải lên và băm chunks thành công
+
+  # =========================================================
+  # NHÓM 6: BÁO CÁO & MỨC TIÊU THỤ (/reports & /usage & /health)
+  # =========================================================
+  /reports/revenue:
+    get:
+      summary: Báo cáo tổng hợp doanh thu theo ngày (Chỉ OWNER)
+      tags: [Reports]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, default: 30 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    report_date: { type: string, format: date, example: "2026-10-21" }
+                    total_orders: { type: integer, example: 12 }
+                    revenue_vnd: { type: integer, example: 3250000 }
+                    total_shipping_fee_vnd: { type: integer, example: 240000 }
+        '403':
+          description: Nhân viên Staff không có quyền xem báo cáo doanh thu
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /reports/top-products:
+    get:
+      summary: Top 5 sản phẩm bán chạy nhất trong tháng
+      tags: [Reports]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    snap_product_name: { type: string, example: "Áo sơ mi lụa trắng dài tay" }
+                    snap_sku: { type: string, example: "SOMI-LUA-TRANG-M" }
+                    total_sold: { type: integer, example: 45 }
+                    total_revenue_vnd: { type: integer, example: 11250000 }
+
+  /reports/low-stock:
+    get:
+      summary: Danh sách toàn bộ biến thể sắp hết hàng (Tồn <= Ngưỡng)
+      tags: [Reports]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    product_name: { type: string }
+                    sku: { type: string }
+                    size: { type: string }
+                    stock: { type: integer }
+                    low_stock_threshold: { type: integer }
+
+  /usage:
+    get:
+      summary: Xem mức dùng tài nguyên AI và hạn mức gói cước tháng này
+      tags: [Usage & Billing]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageReportResponse'
+
+  /health:
+    get:
+      summary: Kiểm tra tình trạng sống còn của hệ thống (Liveness & Readiness probe)
+      tags: [Health]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: "healthy" }
+                  timestamp: { type: string, format: date-time }
+                  database: { type: string, example: "connected" }
+                  uptime_seconds: { type: number, example: 3600.5 }
