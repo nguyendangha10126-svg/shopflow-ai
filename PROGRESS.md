@@ -12,8 +12,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | **U1** | **Sửa lỗi nền & Đồng bộ số liệu** | ✅ **HOÀN THÀNH** | `docs/metrics.md`, `faq.service.ts`, `dashboard.service.ts`, `order.repository.ts`, `customer.repository.ts`, `product.repository.ts`, `DashboardPage.tsx`, `CustomersPage.tsx`, `OrdersPage.tsx`, `format.ts` | API verification (8 đơn, 8 SKU, model config, FAQ 200, spend match) | Không có lỗi. Sẵn sàng vào U2. |
 | **U2** | **Hệ thống thiết kế (Design Tokens, Lucide)** | ✅ **HOÀN THÀNH** | `lucide-react`, `tailwind.config.js`, `index.html`, `Badge.tsx`, `EmptyState.tsx`, `Toast.tsx`, `AppLayout.tsx`, `DesignSystemShowcase.tsx`, `docs/contrast.md` | Kiểm tra typecheck, build 0 lỗi, đối soát `/styleguide` và `docs/contrast.md` | Không có lỗi. Sẵn sàng vào U3. |
 | **U3** | **App Shell & Điều hướng (Mobile + Desktop)** | ✅ **HOÀN THÀNH** | `Sidebar.tsx`, `Topbar.tsx`, `MobileBottomBar.tsx`, `CommandPalette.tsx`, `AppLayout.tsx` | Phím tắt Ctrl+K, responsive mobile 390px, FAB tím giữa, sidebar collapse | Không có lỗi. Sẵn sàng vào U4. |
-| **U4** | **Dán tin AI (1): Ingestion & Clipboard** | ⏳ Đang thực hiện | - | Thử dán tin nhắn từ clipboard, đếm ký tự | Chuyển sang U4 ngay. |
-| **U5** | **Dán tin AI (2): Trình duyệt đơn nháp** | ⏳ Chờ | - | Duyệt đơn nháp 3 phân loại, kiểm tra tô sáng nguồn | Chờ U4 |
+| **U4** | **Dán tin AI (1): Ingestion & Clipboard** | ✅ **HOÀN THÀNH** | `MessageIngestionModal.tsx`, `Modal.tsx` | Clipboard API fallback, 3 tin mẫu 1 chạm, đếm 2.000 ký tự, Lucide icons | Không có lỗi. Sẵn sàng vào U5. |
+| **U5** | **Dán tin AI (2): Trình duyệt đơn nháp** | ⏳ Đang thực hiện | - | Duyệt đơn nháp 3 phân loại, kiểm tra tô sáng nguồn | Chuyển sang U5 ngay. |
 | **U6** | **Quản lý Đơn hàng & Drawer thao tác nhanh** | ⏳ Chờ | - | Drawer chi tiết, sao chép tin nhắn Zalo, gọi khách | Chờ U5 |
 | **U7** | **Quản lý Sản phẩm (1): Lưới, Form, Undo** | ⏳ Chờ | - | Test thêm/sửa sản phẩm, xóa mềm có nút Hoàn tác | Chờ U6 |
 | **U8** | **Quản lý Sản phẩm (2): Tải ảnh & Storage** | ⏳ Chờ | - | Upload ảnh <5MB, client resize, ProductImage fallback | Chờ U7 |
@@ -89,3 +89,22 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
   5. **Tích hợp luồng bóc tách AI toàn cục**:
      - Cho phép mở `MessageIngestionModal` từ bất kỳ vị trí nào trong ứng dụng (Topbar, Sidebar, Bottom Tab, Ctrl+K).
 - **Kiểm chứng**: `npm run lint` & `npm run build` thành công 100%.
+
+### Bước U4: Nâng cấp trải nghiệm Dán tin AI (Ingestion Sheet & Clipboard)
+- **Thời gian**: 2026-10-21 21:45
+- **Công việc đã làm**:
+  1. **Nâng cấp giao diện Ingestion**:
+     - Hỗ trợ tùy biến độ rộng linh hoạt `maxWidth="max-w-2xl"` trên component `Modal.tsx`.
+     - Thay thế toàn bộ emoji bằng biểu tượng Lucide (`Sparkles`, `Clipboard`, `Plus`, `Trash2`, `AlertCircle`, `FileText`, `Loader2`).
+  2. **Thao tác 1 chạm Clipboard an toàn**:
+     - Tự động đọc dữ liệu từ `navigator.clipboard.readText()`.
+     - Xử lý mượt mà khi trình duyệt chặn quyền (Permission Denied / Insecure context) với thông báo hướng dẫn nhẹ nhàng, không gây crash ứng dụng.
+     - Hỗ trợ nút ghép thêm tin nhắn (`+ Ghép thêm tin`) và nút xóa nhanh.
+  3. **Đếm ký tự & Phím tắt nhanh**:
+     - Hiển thị bộ đếm thời gian thực `charCount / 2.000 ký tự` kèm màu cảnh báo khi gần đạt giới hạn.
+     - Hỗ trợ phím tắt `Ctrl + Enter` (hoặc `Cmd + Enter`) để gửi phân tích ngay lập tức.
+  4. **Kịch bản mẫu 1 chạm**:
+     - Bổ sung 3 mẫu tin nhắn thực tế của khách hàng Việt Nam (Đủ thông tin & size, Thiếu size/màu, Nhiều món & viết tắt) để người dùng thử nghiệm nhanh mà không cần gõ.
+  5. **Quy trình phân tích thật minh bạch**:
+     - Không tạo độ trễ giả mạo, hiển thị trạng thái thực tế kèm `aria-live="polite"` cho bộ đọc màn hình.
+- **Kiểm chứng**: `npm run lint` & `npm run build` đạt 100%.

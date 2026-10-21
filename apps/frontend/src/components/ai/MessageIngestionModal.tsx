@@ -1,4 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
+import {
+  Sparkles,
+  Clipboard,
+  Plus,
+  Trash2,
+  AlertTriangle,
+  AlertCircle,
+  Loader2,
+  FileText,
+} from 'lucide-react';
 import { apiClient, ApiClientError } from '../../services/api';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
@@ -13,6 +23,24 @@ export interface MessageIngestionModalProps {
   onAnalysisSuccess: (result: ProcessedAIDraftResult) => void;
 }
 
+const SAMPLE_SCENARIOS = [
+  {
+    id: 'full_order',
+    title: 'Đủ thông tin & size',
+    text: 'Shop ơi ship cho mình 1 Váy hoa nhí dáng xòe Vintage size S màu vàng kem về số 15 ngõ 120 Hoàng Hoa Thám, Ba Đình, Hà Nội. Tên mình là Lê Thu Hương, sđt 0987654321 nhé!',
+  },
+  {
+    id: 'missing_variant',
+    title: 'Thiếu size / màu',
+    text: 'Cho em lấy 1 áo sơ mi lụa cổ V thanh lịch về 45 Lê Duẩn, Quận 1, TP.HCM, sđt 0912345678, em Mai Chi nhé.',
+  },
+  {
+    id: 'multi_items',
+    title: 'Nhiều món & viết tắt',
+    text: 'Lấy 1 váy hoa nhí size M + 2 sơ mi lụa trắng về 88 Nguyễn Trãi, Thanh Xuân, Hà Nội. Nhung 0978901234.',
+  },
+];
+
 export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
   isOpen,
   onClose,
@@ -24,7 +52,6 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
   const [clipboardError, setClipboardError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState<string>('');
-  const [selectedScenario, setSelectedScenario] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState('');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -38,21 +65,20 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
       setIsAnalyzing(false);
       setAnalysisStep('');
     } else {
-      // Khi đóng modal, hủy request đang chạy nếu có
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     }
   }, [isOpen]);
 
-  // 1. Thao tác Đọc nhanh từ Clipboard (Chỉ hoạt động khi có thao tác chạm/click của người dùng)
+  // Đọc nội dung trực tiếp từ Clipboard
   const handleReadClipboard = async (isAppending = false) => {
     setClipboardError(null);
     setErrorMessage('');
 
     if (!navigator.clipboard || !navigator.clipboard.readText) {
       setClipboardError(
-        'Trình duyệt này không hỗ trợ Clipboard API hoặc bạn đang truy cập qua giao thức HTTP không bảo mật. Vui lòng nhập tay vào ô bên dưới.'
+        'Trình duyệt chưa hỗ trợ Clipboard API hoặc đang truy cập qua HTTP không bảo mật. Bạn có thể dán bằng phím tắt Ctrl+V hoặc gõ vào ô bên dưới.'
       );
       textareaRef.current?.focus();
       return;
@@ -63,85 +89,72 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
       const trimmed = text.trim();
 
       if (!trimmed) {
-        showToast('Bộ nhớ tạm (Clipboard) đang trống. Hãy sao chép tin nhắn của khách trước.', 'info');
+        showToast('Bộ nhớ tạm đang trống. Hãy sao chép tin nhắn của khách trước.', 'info');
         textareaRef.current?.focus();
         return;
       }
 
       if (isAppending && message) {
-        // Ghép nhiều tin nhắn liên tiếp
         const combined = `${message}\n${trimmed}`;
         if (combined.length > 2000) {
-          showToast('Tin nhắn sau khi ghép vượt quá giới hạn 2.000 ký tự.', 'error');
+          showToast('Tin nhắn sau khi ghép vượt quá 2.000 ký tự.', 'error');
           return;
         }
         setMessage(combined);
-        showToast('Đã ghép thêm nội dung mới từ Clipboard!', 'success');
+        showToast('Đã ghép thêm nội dung từ bộ nhớ tạm!', 'success');
       } else {
         if (trimmed.length > 2000) {
           setMessage(trimmed.slice(0, 2000));
-          showToast('Tin nhắn quá dài, hệ thống đã tự động cắt ở 2.000 ký tự.', 'info');
+          showToast('Nội dung quá dài, hệ thống đã lấy 2.000 ký tự đầu tiên.', 'info');
         } else {
           setMessage(trimmed);
-          showToast('Đã dán tin nhắn từ Clipboard thành công!', 'success');
+          showToast('Đã dán tin nhắn từ bộ nhớ tạm thành công!', 'success');
         }
       }
-
       textareaRef.current?.focus();
-    } catch (err: any) {
-      // Trình duyệt từ chối cấp quyền truy cập Clipboard (NotAllowedError / Permission denied)
+    } catch {
       setClipboardError(
-        'Trình duyệt chưa được cấp quyền đọc Clipboard (hoặc bạn đã bấm Từ chối). Bạn vui lòng dùng ô nhập tay bên dưới hoặc cho phép quyền trong cài đặt trình duyệt.'
+        'Trình duyệt đang chặn quyền đọc Clipboard. Bạn vui lòng bấm Ctrl+V để dán trực tiếp vào ô văn bản bên dưới.'
       );
       textareaRef.current?.focus();
     }
   };
 
-  // 2. Gửi tin nhắn tới AI Backend với AbortController & Idempotency-Key
   const handleAnalyze = async () => {
     const trimmed = message.trim();
     if (!trimmed) {
-      setErrorMessage('Vui lòng dán hoặc nhập nội dung tin nhắn trước khi phân tích');
+      setErrorMessage('Vui lòng nhập hoặc dán tin nhắn khách trước khi phân tích');
       textareaRef.current?.focus();
       return;
     }
 
     if (trimmed.length > 2000) {
-      setErrorMessage('Tin nhắn không được vượt quá 2.000 ký tự');
+      setErrorMessage('Nội dung không được vượt quá 2.000 ký tự');
       return;
     }
 
     setIsAnalyzing(true);
     setErrorMessage('');
-    setAnalysisStep('🔒 Đang che mờ số điện thoại bảo mật...');
+    setAnalysisStep('Đang bảo vệ dữ liệu cá nhân (che mờ số điện thoại)...');
 
-    // Khởi tạo AbortController để cho phép người dùng bấm Hủy
     const controller = new AbortController();
     abortControllerRef.current = controller;
-
-    // Sinh Idempotency-Key chống gửi trùng
     const idempotencyKey = `draft-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-    // Hiệu ứng các bước phân tích (Visual Stepper)
     const timer1 = setTimeout(() => {
-      setAnalysisStep('🤖 Google Gemini đang bóc tách sản phẩm & địa chỉ...');
-    }, 1200);
+      setAnalysisStep('AI đang nhận diện tên khách, địa chỉ và mã SKU...');
+    }, 800);
 
     const timer2 = setTimeout(() => {
-      setAnalysisStep('📊 Đang đối chiếu giá và tồn kho với PostgreSQL...');
-    }, 2800);
+      setAnalysisStep('Đang kiểm tra tồn kho và đơn giá tức thì...');
+    }, 1800);
 
     try {
       const response = await apiClient.post<{ data: ProcessedAIDraftResult }>(
         '/ai/draft-order',
+        { message: trimmed },
         {
-          message: trimmed,
-          scenario: selectedScenario || undefined,
-        },
-        {
-          headers: {
-            'Idempotency-Key': idempotencyKey,
-          },
+          headers: { 'Idempotency-Key': idempotencyKey },
           signal: controller.signal,
         }
       );
@@ -150,7 +163,7 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
       clearTimeout(timer2);
       setIsAnalyzing(false);
 
-      showToast('Đã bóc tách dữ liệu đơn hàng thành công!', 'success');
+      showToast('Đã bóc tách đơn hàng thành công!', 'success');
       onAnalysisSuccess(response.data);
       onClose();
     } catch (err: any) {
@@ -159,7 +172,7 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
       setIsAnalyzing(false);
 
       if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-        showToast('Đã hủy quá trình phân tích đơn hàng', 'info');
+        showToast('Đã dừng phân tích', 'info');
         return;
       }
 
@@ -171,15 +184,13 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
     }
   };
 
-  // Hủy quá trình phân tích
-  const handleCancelAnalysis = () => {
+  const handleCancel = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     setIsAnalyzing(false);
   };
 
-  // Phím tắt Ctrl + Enter để phân tích nhanh
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
@@ -196,11 +207,12 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={() => !isAnalyzing && onClose()}
-      title="⚡ Tạo Đơn Nhanh Bằng AI (Dán Tin Nhắn)"
+      title="Dán Tin Nhắn Chat — Bóc Tách Đơn AI"
+      maxWidth="max-w-2xl"
     >
       <div className="space-y-4">
-        {/* 1. Thanh nút thao tác Clipboard */}
-        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 rounded-xl">
+        {/* 1. Thanh thao tác Clipboard */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-800/60 rounded-xl">
           <div className="flex items-center space-x-2">
             <Button
               type="button"
@@ -208,9 +220,10 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
               size="sm"
               onClick={() => handleReadClipboard(false)}
               disabled={isAnalyzing}
-              className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 shadow-sm"
+              className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white shadow-sm inline-flex items-center space-x-1.5"
             >
-              📋 Dán nhanh từ Clipboard
+              <Clipboard className="w-3.5 h-3.5" />
+              <span>Dán từ bộ nhớ tạm</span>
             </Button>
 
             {message.trim().length > 0 && (
@@ -220,9 +233,11 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
                 size="sm"
                 onClick={() => handleReadClipboard(true)}
                 disabled={isAnalyzing}
-                title="Đọc nội dung mới từ clipboard và nối tiếp vào tin nhắn hiện có"
+                className="inline-flex items-center space-x-1"
+                title="Ghép thêm nội dung sao chép mới vào sau tin nhắn này"
               >
-                + Ghép thêm tin
+                <Plus className="w-3.5 h-3.5" />
+                <span>Ghép thêm tin</span>
               </Button>
             )}
           </div>
@@ -231,49 +246,47 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
             <button
               type="button"
               onClick={() => setMessage('')}
-              className="text-xs text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 transition"
+              className="text-xs text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 transition inline-flex items-center space-x-1"
             >
-              Xóa trắng
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Xóa</span>
             </button>
           )}
         </div>
 
-        {/* 2. Cảnh báo thân thiện khi Trình duyệt từ chối quyền Clipboard */}
+        {/* 2. Cảnh báo quyền Clipboard nếu bị chặn */}
         {clipboardError && (
           <div
             className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-start space-x-2"
             role="alert"
           >
-            <span className="text-base" aria-hidden="true">
-              ⚠️
-            </span>
-            <div className="space-y-1">
-              <p className="font-semibold">Trình duyệt chưa cho phép đọc Clipboard</p>
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="font-semibold">Mẹo dán tin nhắn:</p>
               <p className="text-[11px] leading-relaxed">{clipboardError}</p>
             </div>
           </div>
         )}
 
-        {/* 3. Lỗi từ hệ thống / API */}
+        {/* 3. Lỗi API nếu có */}
         {errorMessage && (
           <div
             className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-start space-x-2"
             role="alert"
           >
-            <span className="text-base" aria-hidden="true">
-              ❌
-            </span>
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <p className="font-medium">{errorMessage}</p>
           </div>
         )}
 
-        {/* 4. Ô nhập tay dự phòng bắt buộc (Textarea) */}
+        {/* 4. Textarea nhập tin nhắn với đếm ký tự */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
             <label
               htmlFor="raw-message-input"
               className="font-bold text-slate-700 dark:text-slate-300 flex items-center space-x-1"
             >
+              <FileText className="w-3.5 h-3.5 text-indigo-500" />
               <span>Nội dung tin nhắn khách gửi</span>
               <span className="text-rose-500">*</span>
             </label>
@@ -299,98 +312,81 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isAnalyzing}
-            placeholder="Dán hoặc gõ nội dung tin nhắn của khách tại đây...&#10;Ví dụ: Shop ship cho mình 1 đầm hoa nhí size M màu vàng về số 25 Nguyễn Trãi, Thanh Xuân, Hà Nội, sđt 0912345678 nhé, tên mình là Lan."
+            placeholder="Dán hoặc gõ nội dung tin nhắn khách gửi tại đây...&#10;Ví dụ: Shop ship cho mình 1 đầm hoa nhí size S màu vàng về 15 Hoàng Hoa Thám, sđt 0987654321 nhé!"
             className={`w-full rounded-xl border p-3 text-xs sm:text-sm font-sans transition focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 ${
               isOverLimit
                 ? 'border-rose-500 focus:ring-rose-500'
                 : 'border-slate-300 dark:border-slate-700'
             }`}
           />
-          <p className="text-[11px] text-slate-400 flex items-center justify-between">
-            <span>Mẹo: Bạn có thể chỉnh sửa tin nhắn trước khi gửi, hoặc nhấn <b>Ctrl + Enter</b> để phân tích nhanh.</span>
+          <p className="text-[11px] text-slate-400">
+            Mẹo: Nhấn <b>Ctrl + Enter</b> để bắt đầu bóc tách nhanh.
           </p>
         </div>
 
-        {/* 5. Bộ chọn Kịch bản Test giả lập (Dành cho Dev / Kiểm thử chức năng) */}
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-          <details className="text-xs group">
-            <summary className="cursor-pointer font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 flex items-center justify-between select-none">
-              <span>🛠️ Chế độ kiểm thử Kịch bản AI (Tùy chọn)</span>
-              <span className="text-[10px] group-open:rotate-180 transition-transform">▼</span>
-            </summary>
-            <div className="mt-2 p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-lg space-y-2">
-              <p className="text-[11px] text-slate-500">
-                Chọn kịch bản để kiểm thử cách hệ thống phản ứng với các tình huống biên:
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { id: '', label: '⚡ Tự động (Mặc định)' },
-                  { id: 'success', label: '✓ Đơn chuẩn' },
-                  { id: 'ambiguous', label: '⚠️ Thiếu size/màu' },
-                  { id: 'injection', label: '🛡️ Tấn công Prompt' },
-                  { id: 'malformed_json', label: '🔄 Thử lại khi lỗi JSON' },
-                  { id: 'timeout', label: '⏱️ Timeout (>8s)' },
-                ].map((sc) => (
-                  <button
-                    key={sc.id}
-                    type="button"
-                    onClick={() => setSelectedScenario(sc.id)}
-                    className={`px-2 py-1 rounded text-[11px] font-medium transition ${
-                      selectedScenario === sc.id
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    {sc.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </details>
+        {/* 5. Ba nút kịch bản mẫu */}
+        <div className="space-y-1.5 pt-1">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            Hoặc thử nhanh với tin nhắn mẫu:
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {SAMPLE_SCENARIOS.map((sc) => (
+              <button
+                key={sc.id}
+                type="button"
+                disabled={isAnalyzing}
+                onClick={() => {
+                  setMessage(sc.text);
+                  textareaRef.current?.focus();
+                }}
+                className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 transition text-left"
+              >
+                <div className="font-medium text-[11px]">{sc.title}</div>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* 6. Trạng thái Đang phân tích (Skeleton + aria-live) */}
+        {/* 6. Trạng thái phân tích thật */}
         {isAnalyzing && (
           <div
             role="status"
             aria-live="polite"
-            className="p-4 bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 rounded-xl space-y-3 animate-pulse"
+            className="p-4 bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 rounded-xl space-y-3"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center animate-spin">
-                  ⚡
-                </span>
+                <Loader2 className="w-4 h-4 text-purple-600 animate-spin" />
                 <span className="text-xs font-bold text-purple-900 dark:text-purple-200">
-                  ShopFlow AI đang làm việc...
+                  ShopFlow AI đang phân tích...
                 </span>
               </div>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={handleCancelAnalysis}
+                onClick={handleCancel}
                 className="text-xs py-1 h-7 text-rose-600 border-rose-300 hover:bg-rose-50"
               >
-                Hủy phân tích
+                Hủy
               </Button>
             </div>
 
-            <p className="text-xs font-medium text-purple-700 dark:text-purple-300">
+            <p className="text-xs font-medium text-purple-700 dark:text-purple-300 animate-pulse">
               {analysisStep}
             </p>
 
             <div className="space-y-2 pt-1">
-              <Skeleton className="h-4 w-3/4 rounded bg-purple-200/60 dark:bg-purple-900/40" />
-              <Skeleton className="h-4 w-1/2 rounded bg-purple-200/60 dark:bg-purple-900/40" />
+              <Skeleton className="h-3 w-3/4 rounded bg-purple-200/60 dark:bg-purple-900/40" />
+              <Skeleton className="h-3 w-1/2 rounded bg-purple-200/60 dark:bg-purple-900/40" />
             </div>
           </div>
         )}
 
-        {/* 7. Footer Nút hành động */}
+        {/* 7. Footer buttons */}
         <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
           <Badge variant="system" size="sm">
-            🔒 Bảo mật SĐT tự động
+            Bảo vệ SĐT tự động
           </Badge>
 
           <div className="flex items-center space-x-2">
@@ -408,9 +404,10 @@ export const MessageIngestionModal: React.FC<MessageIngestionModalProps> = ({
               onClick={handleAnalyze}
               isLoading={isAnalyzing}
               disabled={isAnalyzing || !message.trim() || isOverLimit}
-              className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800"
+              className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-semibold inline-flex items-center space-x-1.5"
             >
-              🚀 Bắt Đầu Phân Tích
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Bóc tách đơn hàng</span>
             </Button>
           </div>
         </div>
