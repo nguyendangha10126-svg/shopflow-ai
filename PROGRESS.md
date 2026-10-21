@@ -17,8 +17,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | **U6** | **Quản lý Đơn hàng & Drawer thao tác nhanh** | ✅ **HOÀN THÀNH** | `Drawer.tsx`, `OrderDetailDrawer.tsx`, `OrdersPage.tsx` | Drawer chi tiết, chip đếm trạng thái động, sao chép tin nhắn Zalo, gọi khách, modal xác nhận | Không có lỗi. Sẵn sàng vào U7. |
 | **U7** | **Quản lý Sản phẩm (1): Lưới, Form, Undo** | ✅ **HOÀN THÀNH** | `ProductsPage.tsx`, `ProductImage.tsx`, `product.repository.ts`, `product.routes.ts` | Chế độ xem Lưới/Bảng, Thêm/Sửa sản phẩm, Xóa mềm có Hoàn tác (Undo) | Không có lỗi. Sẵn sàng vào U8. |
 | **U8** | **Quản lý Sản phẩm (2): Tải ảnh & Storage** | ✅ **HOÀN THÀNH** | `storage.provider.ts`, `upload.routes.ts`, `ImageUploader.tsx`, `image.ts` | StorageProvider (Disk dev / Cloudinary prod), Client resize & nén WebP, magic bytes | Không có lỗi. Sẵn sàng vào U9. |
-| **U9** | **Khách hàng & Hồ sơ chi tiết (CRM mini)** | ⏳ Đang thực hiện | - | Lịch sử đơn hàng của khách, nhãn Khách quen (>=3 đơn) | Chuyển sang U9 ngay. |
-| **U10**| **Bảng điều khiển Tổng quan (Dashboard)** | ⏳ Chờ | - | Khối Cần xử lý ngay, Biểu đồ có trục/giá trị, KPI | Chờ U9 |
+| **U9** | **Khách hàng & Hồ sơ chi tiết (CRM mini)** | ✅ **HOÀN THÀNH** | `CustomerDetailDrawer.tsx`, `CustomersPage.tsx` | Drawer chi tiết khách hàng, lịch sử đơn hàng, chỉ số AOV, gọi điện 1 chạm, nhãn Khách quen (>=3 đơn) | Không có lỗi. Sẵn sàng vào U10. |
+| **U10**| **Bảng điều khiển Tổng quan (Dashboard)** | ⏳ Đang thực hiện | - | Khối Cần xử lý ngay, Biểu đồ có trục/giá trị, KPI | Chuyển sang U10 ngay. |
 | **U11**| **Chính sách & Trả lời khách (FAQ RAG)** | ⏳ Chờ | - | Trình soạn thảo chính sách, giao diện chat Thử hỏi | Chờ U10 |
 | **U12**| **Landing Page, Onboarding & Chế độ Demo** | ⏳ Chờ | - | Luồng đăng nhập, trang giới thiệu, onboarding 3 bước | Chờ U11 |
 | **U13**| **Tinh chỉnh Motion & PWA Offline** | ⏳ Chờ | - | Kiểm tra ngắt mạng PWA shell, prefers-reduced-motion | Chờ U12 |
@@ -175,6 +175,23 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
   4. **Giao diện Tải ảnh `ImageUploader.tsx` & Hiển thị `ProductImage.tsx`**:
      - Hỗ trợ chọn tối đa 5 ảnh / sản phẩm, chọn ảnh bìa (Cover), xóa ảnh, hiển thị khung ảnh dự phòng thanh lịch khi chưa có ảnh hoặc ảnh lỗi.
 - **Kiểm chứng**: Tuyến đường `POST /api/v1/upload/image` và `npm run build` thành công mỹ mãn.
+
+### Bước U9: Nâng cấp Quản lý Khách hàng & Hồ sơ Chi tiết (Mini CRM)
+- **Thời gian**: 2026-10-21 22:01
+- **Công việc đã làm**:
+  1. **Ngăn kéo Hồ sơ Khách hàng (`CustomerDetailDrawer.tsx`)**:
+     - Hiển thị avatar ký tự viết tắt, thông tin liên lạc, địa chỉ giao hàng và huy hiệu phân loại chuẩn.
+     - **Tích hợp lịch sử đơn hàng của khách**: Tự động tải danh sách các đơn hàng đã đặt của khách theo số điện thoại, hiển thị mã đơn, trạng thái, danh sách mặt hàng và tổng tiền.
+     - **Chỉ số tài chính khách hàng**: Thống kê tổng số đơn mua, tổng chi tiêu tích lũy, và giá trị trung bình trên mỗi đơn hàng (AOV - Average Order Value).
+     - **Thao tác 1 chạm**: Gọi điện thoại trực tiếp (`tel:`), sao chép số điện thoại, sao chép địa chỉ.
+     - Nút "Tạo đơn mới cho khách này" tiện lợi.
+  2. **Thanh chỉ số CRM tổng quan**:
+     - Tổng số khách lưu trữ (6 khách), số lượng khách quen (>=3 đơn), tổng doanh thu tích lũy từ khách hàng.
+  3. **Bộ lọc thông minh & Thẻ khách hàng hiện đại**:
+     - Lọc khách quen, khách mới, tìm kiếm tức thì theo tên hoặc số điện thoại.
+     - Thay thế toàn bộ emoji bằng biểu tượng Lucide (`Users`, `Star`, `Phone`, `ShoppingBag`, `MapPin`, `CreditCard`).
+- **Kiểm chứng**: `npm run lint` & `npm run build` thành công 100%.
+
 
 
 
