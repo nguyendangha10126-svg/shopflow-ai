@@ -11,8 +11,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | **U0** | **Audit repo + Ảnh hiện trạng** | ✅ **HOÀN THÀNH** | `DECISIONS.md`, `PROGRESS.md`, `scripts/capture-screenshots.js`, `docs/screenshots/before/*` | Chạy dev server, chụp đầy đủ ảnh desktop & mobile trước khi nâng cấp | Không có lỗi. Sẵn sàng vào U1. |
 | **U1** | **Sửa lỗi nền & Đồng bộ số liệu** | ✅ **HOÀN THÀNH** | `docs/metrics.md`, `faq.service.ts`, `dashboard.service.ts`, `order.repository.ts`, `customer.repository.ts`, `product.repository.ts`, `DashboardPage.tsx`, `CustomersPage.tsx`, `OrdersPage.tsx`, `format.ts` | API verification (8 đơn, 8 SKU, model config, FAQ 200, spend match) | Không có lỗi. Sẵn sàng vào U2. |
 | **U2** | **Hệ thống thiết kế (Design Tokens, Lucide)** | ✅ **HOÀN THÀNH** | `lucide-react`, `tailwind.config.js`, `index.html`, `Badge.tsx`, `EmptyState.tsx`, `Toast.tsx`, `AppLayout.tsx`, `DesignSystemShowcase.tsx`, `docs/contrast.md` | Kiểm tra typecheck, build 0 lỗi, đối soát `/styleguide` và `docs/contrast.md` | Không có lỗi. Sẵn sàng vào U3. |
-| **U3** | **App Shell & Điều hướng (Mobile + Desktop)** | ⏳ Đang thực hiện | - | Test phím tắt Ctrl+K, responsive 390px, thanh tab đáy | Chuyển sang U3 ngay. |
-| **U4** | **Dán tin AI (1): Ingestion & Clipboard** | ⏳ Chờ | - | Thử dán tin nhắn từ clipboard, đếm ký tự | Chờ U3 |
+| **U3** | **App Shell & Điều hướng (Mobile + Desktop)** | ✅ **HOÀN THÀNH** | `Sidebar.tsx`, `Topbar.tsx`, `MobileBottomBar.tsx`, `CommandPalette.tsx`, `AppLayout.tsx` | Phím tắt Ctrl+K, responsive mobile 390px, FAB tím giữa, sidebar collapse | Không có lỗi. Sẵn sàng vào U4. |
+| **U4** | **Dán tin AI (1): Ingestion & Clipboard** | ⏳ Đang thực hiện | - | Thử dán tin nhắn từ clipboard, đếm ký tự | Chuyển sang U4 ngay. |
 | **U5** | **Dán tin AI (2): Trình duyệt đơn nháp** | ⏳ Chờ | - | Duyệt đơn nháp 3 phân loại, kiểm tra tô sáng nguồn | Chờ U4 |
 | **U6** | **Quản lý Đơn hàng & Drawer thao tác nhanh** | ⏳ Chờ | - | Drawer chi tiết, sao chép tin nhắn Zalo, gọi khách | Chờ U5 |
 | **U7** | **Quản lý Sản phẩm (1): Lưới, Form, Undo** | ⏳ Chờ | - | Test thêm/sửa sản phẩm, xóa mềm có nút Hoàn tác | Chờ U6 |
@@ -70,3 +70,22 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
   4. Mở rộng trang Styleguide tại tuyến đường `/styleguide` (và `/showcase`) giới thiệu phân cấp 3 loại dữ liệu (Sự thật Hệ thống, AI gợi ý, AI cần hỏi lại).
   5. Viết tài liệu kiểm thử tương phản `docs/contrast.md` chứng minh 100% token đạt chuẩn WCAG 2.1 AA (tỷ lệ tương phản từ `4.6:1` đến `16.1:1`).
 - **Kiểm chứng**: `npm run lint` & `npm run build` sạch 100%, 0 lỗi TypeScript.
+
+### Bước U3: Hoàn thiện App Shell, Topbar, Sidebar cố định & Điều hướng Mobile First
+- **Thời gian**: 2026-10-21 21:43
+- **Công việc đã làm**:
+  1. **Sidebar cố định toàn màn hình**:
+     - Cố định chiều cao `h-screen sticky top-0 overflow-y-auto`, giải quyết triệt để lỗi sidebar bị cụt khi cuộn trang dài.
+     - Hỗ trợ chế độ thu gọn icon-only (`w-20`) và mở rộng đầy đủ (`w-64`) kèm phím tắt `Alt+S`.
+     - Loại bỏ khối hiển thị và nút Đăng xuất to ở đáy sidebar, chuyển vào Topbar và Menu người dùng.
+  2. **Thanh Topbar đa năng**:
+     - Tích hợp ô kích hoạt tìm kiếm toàn cục, nút Dán tin AI nhanh, chuyển đổi Sáng/Tối.
+     - Hộp thông báo thời gian thực và Menu tài khoản người dùng kèm tùy chọn bật/tắt "Chế độ xem kỹ thuật".
+  3. **Thanh Tab đáy di động & Nút nổi FAB**:
+     - Tối ưu hóa ngón cái (Thumb-zone) trên điện thoại với 5 điểm chạm.
+     - Nút nổi chính giữa (Floating Action Button) màu tím gradient với hiệu ứng ánh sáng, mở trực tiếp luồng chốt đơn AI.
+  4. **Command Palette toàn cục (Ctrl+K / Cmd+K)**:
+     - Cho phép tìm kiếm tức thì mọi trang và thực thi các thao tác nhanh qua bàn phím.
+  5. **Tích hợp luồng bóc tách AI toàn cục**:
+     - Cho phép mở `MessageIngestionModal` từ bất kỳ vị trí nào trong ứng dụng (Topbar, Sidebar, Bottom Tab, Ctrl+K).
+- **Kiểm chứng**: `npm run lint` & `npm run build` thành công 100%.

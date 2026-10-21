@@ -1,28 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  ShoppingBag,
-  Shirt,
-  Users,
-  HelpCircle,
-  Moon,
-  Sun,
-  LogOut,
-  Palette,
-} from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import Button from '../ui/Button';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Outlet } from 'react-router-dom';
+import Sidebar from './Sidebar';
+import Topbar from './Topbar';
+import MobileBottomBar from './MobileBottomBar';
+import CommandPalette from './CommandPalette';
+import MessageIngestionModal from '../ai/MessageIngestionModal';
+import DraftOrderReviewModal from '../ai/DraftOrderReviewModal';
+import { ProcessedAIDraftResult } from '../../types/ai.types';
 
 export const AppLayout: React.FC = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const [isDark, setIsDark] = useState<boolean>(() => {
     return (
       localStorage.getItem('sf_theme') === 'dark' ||
       (!('sf_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
     );
   });
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('sf_sidebar_collapsed') === 'true';
+  });
+
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isAiIngestOpen, setIsAiIngestOpen] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [reviewResult, setReviewResult] = useState<ProcessedAIDraftResult | null>(null);
 
   useEffect(() => {
     if (isDark) {
@@ -34,182 +35,101 @@ export const AppLayout: React.FC = () => {
     }
   }, [isDark]);
 
-  const toggleDarkMode = () => setIsDark(!isDark);
+  const toggleDarkMode = useCallback(() => setIsDark((prev) => !prev), []);
 
-  const navItems = [
-    { to: '/', label: 'Tổng quan', icon: LayoutDashboard },
-    { to: '/orders', label: 'Đơn hàng', icon: ShoppingBag },
-    { to: '/products', label: 'Sản phẩm', icon: Shirt },
-    { to: '/customers', label: 'Khách hàng', icon: Users },
-    { to: '/faq', label: 'Chính sách & Hỏi đáp', icon: HelpCircle },
-    { to: '/styleguide', label: 'Styleguide', icon: Palette },
-  ];
+  const toggleSidebarCollapse = useCallback(() => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('sf_sidebar_collapsed', String(next));
+      return next;
+    });
+  }, []);
+
+  // Global Keyboard Shortcuts (Ctrl+K for Command Palette, Alt+S for Sidebar collapse)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+      if (e.altKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        toggleSidebarCollapse();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleSidebarCollapse]);
+
+  const handleAiSuccess = (result: ProcessedAIDraftResult) => {
+    setReviewResult(result);
+    setIsReviewOpen(true);
+  };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
+    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased font-sans selection:bg-indigo-500 selection:text-white">
       {/* 1. Skip-link trợ năng bàn phím */}
       <a href="#main-content" className="skip-link">
         Chuyển đến nội dung chính (Phím tắt Tab)
       </a>
 
-      {/* 2. Desktop Sidebar (Ẩn trên mobile, hiện trên md:block) */}
-      <aside className="hidden md:flex md:w-64 flex-col justify-between border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sticky top-0 h-screen select-none">
-        <div>
-          {/* Logo & Shop Info */}
-          <div className="flex items-center space-x-3 px-2 py-3 mb-6 border-b border-slate-100 dark:border-slate-800">
-            <span className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-sm shadow-sm">
-              SF
-            </span>
-            <div className="overflow-hidden">
-              <h1 className="font-bold text-sm truncate text-slate-900 dark:text-slate-100">
-                {user?.shop?.name || 'ShopFlow AI'}
-              </h1>
-              <p className="text-[11px] text-slate-400 truncate">
-                {user?.role === 'OWNER' ? '👑 Chủ cửa hàng' : 'Nhân viên shop'}
-              </p>
-            </div>
-          </div>
+      {/* 2. Desktop Collapsible Full-Height Sidebar */}
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapse}
+        onOpenAiIngest={() => setIsAiIngestOpen(true)}
+      />
 
-          {/* Navigation Links */}
-          <nav className="space-y-1" aria-label="Menu thanh điều hướng">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === '/'}
-                  className={({ isActive }) =>
-                    `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                      isActive
-                        ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-                    }`
-                  }
-                >
-                  <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
-                  <span>{item.label}</span>
-                </NavLink>
-              );
-            })}
-          </nav>
-        </div>
+      {/* 3. Main Application Column */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen pb-16 md:pb-0">
+        {/* Topbar with Global Search, Notifications & Account */}
+        <Topbar
+          onToggleSidebar={toggleSidebarCollapse}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenAiIngest={() => setIsAiIngestOpen(true)}
+          isDark={isDark}
+          onToggleDarkMode={toggleDarkMode}
+        />
 
-        {/* Footer Sidebar: User info & Theme Toggle */}
-        <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between px-2">
-            <span className="text-xs text-slate-500">Chế độ hiển thị</span>
-            <button
-              onClick={toggleDarkMode}
-              className="inline-flex items-center space-x-1.5 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 transition"
-              aria-label="Chuyển đổi giao diện Sáng / Tối"
-            >
-              {isDark ? (
-                <>
-                  <Moon className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Tối</span>
-                </>
-              ) : (
-                <>
-                  <Sun className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Sáng</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="px-2 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 text-xs">
-            <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-              {user?.full_name || 'Người dùng'}
-            </p>
-            <p className="text-slate-400 truncate text-[11px]">{user?.email}</p>
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              logout();
-              navigate('/login');
-            }}
-            className="w-full text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-rose-200 dark:border-rose-900 inline-flex items-center justify-center space-x-1.5"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Đăng xuất</span>
-          </Button>
-        </div>
-      </aside>
-
-      {/* 3. Main Content Wrapper */}
-      <div className="flex-1 flex flex-col min-h-screen pb-16 md:pb-0">
-        {/* Mobile Header Bar */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40">
-          <div className="flex items-center space-x-2.5">
-            <span className="w-7 h-7 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center text-xs">
-              SF
-            </span>
-            <h1 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate max-w-[180px]">
-              {user?.shop?.name || 'ShopFlow AI'}
-            </h1>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={toggleDarkMode}
-              aria-label="Đổi giao diện Sáng/Tối"
-              className="p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
-            >
-              {isDark ? <Moon className="w-4 h-4 text-indigo-400" /> : <Sun className="w-4 h-4 text-amber-500" />}
-            </button>
-            <button
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
-              aria-label="Đăng xuất"
-              className="p-1.5 text-xs text-rose-500 font-semibold inline-flex items-center space-x-1"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Thoát</span>
-            </button>
-          </div>
-        </header>
-
-        {/* 4. Nội dung trang chính */}
+        {/* Main Content Area */}
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto focus:outline-none"
+          className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto focus:outline-none transition-all"
         >
           <Outlet />
         </main>
       </div>
 
-      {/* 5. Mobile Bottom Navigation Tab Bar (Dính đáy cố định trên mobile) */}
-      <nav
-        aria-label="Menu tab đáy di động"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex items-center justify-around py-1.5 select-none"
-      >
-        {navItems.slice(0, 5).map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center py-1 px-2 text-[10px] font-medium transition ${
-                  isActive
-                    ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
-                }`
-              }
-            >
-              <Icon className="w-4 h-4 mb-0.5" aria-hidden="true" />
-              <span>{item.label}</span>
-            </NavLink>
-          );
-        })}
-      </nav>
+      {/* 4. Mobile Bottom Navigation with Floating Action Button (FAB) */}
+      <MobileBottomBar onOpenAiIngest={() => setIsAiIngestOpen(true)} />
+
+      {/* 5. Global Command Palette (Ctrl+K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onOpenAiIngest={() => setIsAiIngestOpen(true)}
+        onToggleTheme={toggleDarkMode}
+        isDark={isDark}
+      />
+
+      {/* 6. Global Shared AI Ingestion Sheet & Review Modal */}
+      <MessageIngestionModal
+        isOpen={isAiIngestOpen}
+        onClose={() => setIsAiIngestOpen(false)}
+        onAnalysisSuccess={handleAiSuccess}
+      />
+
+      <DraftOrderReviewModal
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+        reviewData={reviewResult}
+        onOrderConfirmed={() => {
+          setIsReviewOpen(false);
+          // Thông báo cho trang hiện tại reload dữ liệu nếu cần
+          window.dispatchEvent(new Event('sf_order_created'));
+        }}
+      />
     </div>
   );
 };
