@@ -20,8 +20,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | **U9** | **Khách hàng & Hồ sơ chi tiết (CRM mini)** | ✅ **HOÀN THÀNH** | `CustomerDetailDrawer.tsx`, `CustomersPage.tsx` | Drawer chi tiết khách hàng, lịch sử đơn hàng, chỉ số AOV, gọi điện 1 chạm, nhãn Khách quen (>=3 đơn) | Không có lỗi. Sẵn sàng vào U10. |
 | **U10**| **Bảng điều khiển Tổng quan (Dashboard)** | ✅ **HOÀN THÀNH** | `DashboardPage.tsx` | Khối Cần xử lý ngay, Biểu đồ 7 ngày có trục Y & bảng thay thế, KPI chuẩn hóa, hạn mức AI | Không có lỗi. Sẵn sàng vào U11. |
 | **U11**| **Chính sách & Trả lời khách (FAQ RAG)** | ✅ **HOÀN THÀNH** | `FaqPage.tsx` | Đổi tên thân thiện, Khung chat mô phỏng khách, trích dẫn nguồn, đánh giá phản hồi, nạp 3 chính sách mẫu | Không có lỗi. Sẵn sàng vào U12. |
-| **U12**| **Landing Page, Onboarding & Chế độ Demo** | ⏳ Đang thực hiện | - | Luồng đăng nhập, trang giới thiệu, onboarding 3 bước | Chuyển sang U12 ngay. |
-| **U13**| **Tinh chỉnh Motion & PWA Offline** | ⏳ Chờ | - | Kiểm tra ngắt mạng PWA shell, prefers-reduced-motion | Chờ U12 |
+| **U12**| **Landing Page, Onboarding & Chế độ Demo** | ✅ **HOÀN THÀNH** | `LandingPage.tsx`, `OnboardingModal.tsx`, `App.tsx`, `AppLayout.tsx`, `LoginPage.tsx` | Trang giới thiệu sản phẩm thương mại, Onboarding 3 bước, bảng giá chuẩn A3, đăng nhập 1 chạm | Không có lỗi. Sẵn sàng vào U13. |
+| **U13**| **Tinh chỉnh Motion & PWA Offline** | ⏳ Đang thực hiện | - | Kiểm tra ngắt mạng PWA shell, prefers-reduced-motion | Chuyển sang U13 ngay. |
 | **U14**| **Kiểm thử toàn diện, Đo lường & Nghiệm thu**| ⏳ Chờ | - | Lighthouse >=90/95, axe 0 lỗi, ảnh `docs/screenshots/after/*` | Chờ U13 |
 
 ---
@@ -128,6 +128,25 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
      - **Nút hành động**: Sao chép câu trả lời để gửi khách, nút đánh giá phản hồi (Hữu ích / Cần cải thiện).
   4. **Loại bỏ 100% Emoji**: Thay thế bằng Lucide SVG (`BookOpen`, `MessageSquare`, `Plus`, `Pencil`, `Trash2`, `Copy`, `ThumbsUp`, `ThumbsDown`, `Quote`, `Send`).
 - **Kiểm chứng**: `npm run lint` & `npm run build` vượt qua 100%.
+
+### Bước U12: Xây dựng Landing Page, Onboarding & Chế Độ Demo
+- **Thời gian**: 2026-10-21 22:10
+- **Công việc đã làm**:
+  1. **Trang Giới Thiệu Thương Mại Hiện Đại (`LandingPage.tsx`)**:
+     - Tiêu đề định vị giá trị: *"Chốt đơn đa kênh trong 3 giây - Quản lý kho tức thời, không sợ bán trùng"*.
+     - 3 thẻ tính năng cốt lõi (Dán tin AI 1 chạm, Trừ kho an toàn tức thì, Trả lời khách theo chính sách shop).
+     - **Bảng giá 3 gói (Free / Basic / Pro)**: Thể hiện chuẩn mực với nhãn *"Giá sẽ cập nhật"* theo đúng quy định Rule A3.
+     - Lời chứng thực thực tế từ các chủ shop thời trang tại Hà Nội, TP.HCM và Đà Nẵng.
+     - Nút "Thử Demo ngay" 1-click đăng nhập tài khoản cửa hàng mẫu May Boutique và nhảy thẳng vào dashboard.
+  2. **Hướng dẫn Khởi Động 3 Bước (`OnboardingModal.tsx`)**:
+     - Bước 1: Thiết lập tên cửa hàng, hotline và ngành hàng thời trang.
+     - Bước 2: Nạp sẵn 4 sản phẩm (8 SKUs) và 3 chính sách shop.
+     - Bước 3: Thử nghiệm dán tin nhắn AI đầu tiên.
+     - Tự động kích hoạt khi chủ shop lần đầu truy cập, lưu trạng thái hoàn thành vào `localStorage`.
+  3. **Thanh Chỉ Báo Trải Nghiệm Cửa Hàng Mẫu**:
+     - Thanh banner nhẹ nhàng tại App Shell cho biết cửa hàng đang hoạt động ở chế độ trải nghiệm kèm nút mở nhanh hướng dẫn 3 bước.
+- **Kiểm chứng**: Tuyến đường `/welcome` và `/landing` hoạt động trơn tru; `npm run build` thành công 100%.
+
 
 
 
@@ -271,6 +290,25 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
      - **Nút hành động**: Sao chép câu trả lời để gửi khách, nút đánh giá phản hồi (Hữu ích / Cần cải thiện).
   4. **Loại bỏ 100% Emoji**: Thay thế bằng Lucide SVG (`BookOpen`, `MessageSquare`, `Plus`, `Pencil`, `Trash2`, `Copy`, `ThumbsUp`, `ThumbsDown`, `Quote`, `Send`).
 - **Kiểm chứng**: `npm run lint` & `npm run build` vượt qua 100%.
+
+### Bước U12: Xây dựng Landing Page, Onboarding & Chế Độ Demo
+- **Thời gian**: 2026-10-21 22:10
+- **Công việc đã làm**:
+  1. **Trang Giới Thiệu Thương Mại Hiện Đại (`LandingPage.tsx`)**:
+     - Tiêu đề định vị giá trị: *"Chốt đơn đa kênh trong 3 giây - Quản lý kho tức thời, không sợ bán trùng"*.
+     - 3 thẻ tính năng cốt lõi (Dán tin AI 1 chạm, Trừ kho an toàn tức thì, Trả lời khách theo chính sách shop).
+     - **Bảng giá 3 gói (Free / Basic / Pro)**: Thể hiện chuẩn mực với nhãn *"Giá sẽ cập nhật"* theo đúng quy định Rule A3.
+     - Lời chứng thực thực tế từ các chủ shop thời trang tại Hà Nội, TP.HCM và Đà Nẵng.
+     - Nút "Thử Demo ngay" 1-click đăng nhập tài khoản cửa hàng mẫu May Boutique và nhảy thẳng vào dashboard.
+  2. **Hướng dẫn Khởi Động 3 Bước (`OnboardingModal.tsx`)**:
+     - Bước 1: Thiết lập tên cửa hàng, hotline và ngành hàng thời trang.
+     - Bước 2: Nạp sẵn 4 sản phẩm (8 SKUs) và 3 chính sách shop.
+     - Bước 3: Thử nghiệm dán tin nhắn AI đầu tiên.
+     - Tự động kích hoạt khi chủ shop lần đầu truy cập, lưu trạng thái hoàn thành vào `localStorage`.
+  3. **Thanh Chỉ Báo Trải Nghiệm Cửa Hàng Mẫu**:
+     - Thanh banner nhẹ nhàng tại App Shell cho biết cửa hàng đang hoạt động ở chế độ trải nghiệm kèm nút mở nhanh hướng dẫn 3 bước.
+- **Kiểm chứng**: Tuyến đường `/welcome` và `/landing` hoạt động trơn tru; `npm run build` thành công 100%.
+
 
 
 

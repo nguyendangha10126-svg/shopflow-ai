@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Sparkles, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { apiClient, ApiClientError } from '../services/api';
@@ -123,23 +124,35 @@ export const LoginPage: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={handleFillDemo}
-              className="w-full text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 hover:bg-indigo-50"
+              className="w-full text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 hover:bg-indigo-50 font-semibold"
             >
-              ⚡ 1-Click Điền Tài Khoản Demo (Mây Boutique)
+              <Sparkles className="w-4 h-4 mr-1.5" />
+              Điền tài khoản Demo (May Boutique)
             </Button>
           </div>
         </Card>
 
-        {/* Footer Link to Register */}
-        <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-          Chưa có cửa hàng trên ShopFlow?{' '}
-          <Link
-            to="/register"
-            className="font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-          >
-            Đăng ký shop mới ngay
-          </Link>
-        </p>
+        {/* Footer Link to Register and Landing */}
+        <div className="text-center space-y-2 text-xs text-slate-500 dark:text-slate-400">
+          <p>
+            Chưa có cửa hàng trên ShopFlow?{' '}
+            <Link
+              to="/register"
+              className="font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+            >
+              Đăng ký shop mới ngay
+            </Link>
+          </p>
+          <p>
+            <Link
+              to="/welcome"
+              className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Quay lại trang giới thiệu</span>
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
 import OrdersPage from './pages/OrdersPage';
 import ProductsPage from './pages/ProductsPage';
@@ -19,7 +20,9 @@ export const App: React.FC = () => {
       <AuthProvider>
         <ToastProvider>
           <Routes>
-            {/* 1. Tuyến đường công khai (Xác thực đăng nhập/đăng ký) */}
+            {/* 1. Tuyến đường công khai (Landing Page & Xác thực) */}
+            <Route path="/welcome" element={<LandingPage />} />
+            <Route path="/landing" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 

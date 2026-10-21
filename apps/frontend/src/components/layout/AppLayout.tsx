@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet } from 'react-router-dom';
+import { HelpCircle } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import MobileBottomBar from './MobileBottomBar';
 import CommandPalette from './CommandPalette';
 import MessageIngestionModal from '../ai/MessageIngestionModal';
 import DraftOrderReviewModal from '../ai/DraftOrderReviewModal';
+import OnboardingModal from '../onboarding/OnboardingModal';
 import { ProcessedAIDraftResult } from '../../types/ai.types';
 
 export const AppLayout: React.FC = () => {
@@ -24,6 +26,9 @@ export const AppLayout: React.FC = () => {
   const [isAiIngestOpen, setIsAiIngestOpen] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [reviewResult, setReviewResult] = useState<ProcessedAIDraftResult | null>(null);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
+    return localStorage.getItem('shopflow_onboarding_completed') !== 'true';
+  });
 
   useEffect(() => {
     if (isDark) {
@@ -91,6 +96,22 @@ export const AppLayout: React.FC = () => {
           onToggleDarkMode={toggleDarkMode}
         />
 
+        {/* Demo Mode Indicator & Onboarding shortcut */}
+        <div className="bg-indigo-600/10 dark:bg-indigo-900/30 border-b border-indigo-200/50 dark:border-indigo-800/40 px-4 py-1.5 flex items-center justify-between text-xs text-indigo-900 dark:text-indigo-200">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Cửa hàng trải nghiệm: <b>May Boutique</b></span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsOnboardingOpen(true)}
+            className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>Hướng dẫn 3 bước</span>
+          </button>
+        </div>
+
         {/* Main Content Area */}
         <main
           id="main-content"
@@ -129,6 +150,13 @@ export const AppLayout: React.FC = () => {
           // Thông báo cho trang hiện tại reload dữ liệu nếu cần
           window.dispatchEvent(new Event('sf_order_created'));
         }}
+      />
+
+      {/* 7. Onboarding 3-step Wizard */}
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        onOpenAiIngest={() => setIsAiIngestOpen(true)}
       />
     </div>
   );
