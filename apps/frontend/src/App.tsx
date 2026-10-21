@@ -31,6 +31,7 @@ export const App: React.FC = () => {
                 <Route path="products" element={<ProductsPage />} />
                 <Route path="customers" element={<CustomersPage />} />
                 <Route path="faq" element={<FaqPage />} />
+                <Route path="styleguide" element={<DesignSystemShowcase />} />
                 <Route path="showcase" element={<DesignSystemShowcase />} />
               </Route>
             </Route>

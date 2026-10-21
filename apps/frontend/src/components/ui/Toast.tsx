@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
 export interface ToastItem {
   id: string;
@@ -78,24 +79,39 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 : 'bg-indigo-600 text-white border-indigo-700'
             }`}
           >
-            <div className="flex items-center space-x-2">
-              <span aria-hidden="true">
-                {toast.type === 'success' ? '✓' : toast.type === 'error' ? '⚠️' : 'ℹ️'}
+            <div className="flex items-center space-x-2.5">
+              <span aria-hidden="true" className="shrink-0">
+                {toast.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                ) : toast.type === 'error' ? (
+                  <AlertTriangle className="w-4 h-4 text-rose-200" />
+                ) : (
+                  <Info className="w-4 h-4 text-indigo-200" />
+                )}
               </span>
               <p className="font-medium text-xs sm:text-sm">{toast.message}</p>
             </div>
 
-            {toast.onUndo && (
+            <div className="flex items-center space-x-2">
+              {toast.onUndo && (
+                <button
+                  onClick={() => {
+                    toast.onUndo?.();
+                    removeToast(toast.id);
+                  }}
+                  className="px-2 py-1 text-xs font-semibold bg-white/20 hover:bg-white/30 rounded transition"
+                >
+                  Hoàn tác
+                </button>
+              )}
               <button
-                onClick={() => {
-                  toast.onUndo?.();
-                  removeToast(toast.id);
-                }}
-                className="ml-4 px-2 py-1 text-xs font-bold underline bg-white/20 hover:bg-white/30 rounded transition"
+                onClick={() => removeToast(toast.id)}
+                className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition"
+                aria-label="Đóng thông báo"
               >
-                Hoàn tác
+                <X className="w-3.5 h-3.5" />
               </button>
-            )}
+            </div>
           </div>
         ))}
       </div>

@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  ShoppingBag,
+  Shirt,
+  Users,
+  HelpCircle,
+  Moon,
+  Sun,
+  LogOut,
+  Palette,
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';
 
@@ -26,11 +37,12 @@ export const AppLayout: React.FC = () => {
   const toggleDarkMode = () => setIsDark(!isDark);
 
   const navItems = [
-    { to: '/', label: 'Tổng quan', icon: '⚡' },
-    { to: '/orders', label: 'Đơn hàng', icon: '📋' },
-    { to: '/products', label: 'Sản phẩm', icon: '👗' },
-    { to: '/customers', label: 'Khách hàng', icon: '👥' },
-    { to: '/faq', label: 'Tư vấn FAQ', icon: '📚' },
+    { to: '/', label: 'Tổng quan', icon: LayoutDashboard },
+    { to: '/orders', label: 'Đơn hàng', icon: ShoppingBag },
+    { to: '/products', label: 'Sản phẩm', icon: Shirt },
+    { to: '/customers', label: 'Khách hàng', icon: Users },
+    { to: '/faq', label: 'Chính sách & Hỏi đáp', icon: HelpCircle },
+    { to: '/styleguide', label: 'Styleguide', icon: Palette },
   ];
 
   return (
@@ -60,25 +72,26 @@ export const AppLayout: React.FC = () => {
 
           {/* Navigation Links */}
           <nav className="space-y-1" aria-label="Menu thanh điều hướng">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                className={({ isActive }) =>
-                  `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                    isActive
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-                  }`
-                }
-              >
-                <span className="text-base" aria-hidden="true">
-                  {item.icon}
-                </span>
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/'}
+                  className={({ isActive }) =>
+                    `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                      isActive
+                        ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                    }`
+                  }
+                >
+                  <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            })}
           </nav>
         </div>
 
@@ -88,10 +101,20 @@ export const AppLayout: React.FC = () => {
             <span className="text-xs text-slate-500">Chế độ hiển thị</span>
             <button
               onClick={toggleDarkMode}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs"
+              className="inline-flex items-center space-x-1.5 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 transition"
               aria-label="Chuyển đổi giao diện Sáng / Tối"
             >
-              {isDark ? '🌙 Tối' : '☀️ Sáng'}
+              {isDark ? (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Tối</span>
+                </>
+              ) : (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Sáng</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -109,9 +132,10 @@ export const AppLayout: React.FC = () => {
               logout();
               navigate('/login');
             }}
-            className="w-full text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-rose-200 dark:border-rose-900"
+            className="w-full text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-rose-200 dark:border-rose-900 inline-flex items-center justify-center space-x-1.5"
           >
-            Đăng xuất
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Đăng xuất</span>
           </Button>
         </div>
       </aside>
@@ -132,9 +156,9 @@ export const AppLayout: React.FC = () => {
             <button
               onClick={toggleDarkMode}
               aria-label="Đổi giao diện Sáng/Tối"
-              className="p-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700"
+              className="p-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
             >
-              {isDark ? '🌙' : '☀️'}
+              {isDark ? <Moon className="w-4 h-4 text-indigo-400" /> : <Sun className="w-4 h-4 text-amber-500" />}
             </button>
             <button
               onClick={() => {
@@ -142,9 +166,10 @@ export const AppLayout: React.FC = () => {
                 navigate('/login');
               }}
               aria-label="Đăng xuất"
-              className="p-1.5 text-xs text-rose-500 font-semibold"
+              className="p-1.5 text-xs text-rose-500 font-semibold inline-flex items-center space-x-1"
             >
-              Thoát
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Thoát</span>
             </button>
           </div>
         </header>
@@ -162,27 +187,28 @@ export const AppLayout: React.FC = () => {
       {/* 5. Mobile Bottom Navigation Tab Bar (Dính đáy cố định trên mobile) */}
       <nav
         aria-label="Menu tab đáy di động"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex items-center justify-around py-2 select-none"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex items-center justify-around py-1.5 select-none"
       >
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/'}
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-1 px-3 text-[10px] font-medium transition ${
-                isActive
-                  ? 'text-indigo-600 dark:text-indigo-400 font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
-              }`
-            }
-          >
-            <span className="text-lg leading-none mb-0.5" aria-hidden="true">
-              {item.icon}
-            </span>
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+        {navItems.slice(0, 5).map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center py-1 px-2 text-[10px] font-medium transition ${
+                  isActive
+                    ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                }`
+              }
+            >
+              <Icon className="w-4 h-4 mb-0.5" aria-hidden="true" />
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
     </div>
   );

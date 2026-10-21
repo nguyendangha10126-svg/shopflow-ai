@@ -10,8 +10,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | :--- | :--- | :---: | :--- | :--- | :--- |
 | **U0** | **Audit repo + Ảnh hiện trạng** | ✅ **HOÀN THÀNH** | `DECISIONS.md`, `PROGRESS.md`, `scripts/capture-screenshots.js`, `docs/screenshots/before/*` | Chạy dev server, chụp đầy đủ ảnh desktop & mobile trước khi nâng cấp | Không có lỗi. Sẵn sàng vào U1. |
 | **U1** | **Sửa lỗi nền & Đồng bộ số liệu** | ✅ **HOÀN THÀNH** | `docs/metrics.md`, `faq.service.ts`, `dashboard.service.ts`, `order.repository.ts`, `customer.repository.ts`, `product.repository.ts`, `DashboardPage.tsx`, `CustomersPage.tsx`, `OrdersPage.tsx`, `format.ts` | API verification (8 đơn, 8 SKU, model config, FAQ 200, spend match) | Không có lỗi. Sẵn sàng vào U2. |
-| **U2** | **Hệ thống thiết kế (Design Tokens, Lucide)** | ⏳ Đang thực hiện | - | Kiểm tra typecheck, xem trang `/styleguide` | Chuyển sang U2 ngay. |
-| **U3** | **App Shell & Điều hướng (Mobile + Desktop)** | ⏳ Chờ | - | Test phím tắt Ctrl+K, responsive 390px, thanh tab đáy | Chờ U2 |
+| **U2** | **Hệ thống thiết kế (Design Tokens, Lucide)** | ✅ **HOÀN THÀNH** | `lucide-react`, `tailwind.config.js`, `index.html`, `Badge.tsx`, `EmptyState.tsx`, `Toast.tsx`, `AppLayout.tsx`, `DesignSystemShowcase.tsx`, `docs/contrast.md` | Kiểm tra typecheck, build 0 lỗi, đối soát `/styleguide` và `docs/contrast.md` | Không có lỗi. Sẵn sàng vào U3. |
+| **U3** | **App Shell & Điều hướng (Mobile + Desktop)** | ⏳ Đang thực hiện | - | Test phím tắt Ctrl+K, responsive 390px, thanh tab đáy | Chuyển sang U3 ngay. |
 | **U4** | **Dán tin AI (1): Ingestion & Clipboard** | ⏳ Chờ | - | Thử dán tin nhắn từ clipboard, đếm ký tự | Chờ U3 |
 | **U5** | **Dán tin AI (2): Trình duyệt đơn nháp** | ⏳ Chờ | - | Duyệt đơn nháp 3 phân loại, kiểm tra tô sáng nguồn | Chờ U4 |
 | **U6** | **Quản lý Đơn hàng & Drawer thao tác nhanh** | ⏳ Chờ | - | Drawer chi tiết, sao chép tin nhắn Zalo, gọi khách | Chờ U5 |
@@ -56,3 +56,17 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 - **Kiểm chứng**:
   - `npm run lint` & `npm run build` vượt qua 100% không cảnh báo.
   - Test trực tiếp 5 endpoint backend qua curl: Dashboard, Orders, Customers, Products, FAQ đều trả về 200 OK với số liệu khớp nhau từng đơn vị.
+
+### Bước U2: Thiết lập hệ thống thiết kế (Design System & Tokens)
+- **Thời gian**: 2026-10-21 21:40
+- **Công việc đã làm**:
+  1. Cài đặt bộ icon SVG chuẩn mực `lucide-react`, loại bỏ hoàn toàn việc sử dụng emoji làm icon điều hướng và trạng thái.
+  2. Tích hợp font chữ thương mại: Cặp font `Be Vietnam Pro` (tiêu đề, con số, chỉ số KPI) + `Inter` (thân văn bản và điều khiển form).
+  3. Nâng cấp các thành phần nền tảng:
+     - `Badge.tsx`: Tích hợp các icon chuẩn (`ShieldCheck`, `Sparkles`, `AlertCircle`, `CheckCircle2`), sửa lỗi nhân đôi icon.
+     - `EmptyState.tsx`: Thẻ minh họa hình khối chuyên nghiệp kèm icon SVG và nút hành động kép.
+     - `Toast.tsx`: Loại bỏ emoji, thay bằng `CheckCircle2`, `AlertTriangle`, `Info` và nút đóng `X`.
+     - `AppLayout.tsx`: Chuyển đổi toàn bộ icon sidebar và bottom tab sang Lucide SVG.
+  4. Mở rộng trang Styleguide tại tuyến đường `/styleguide` (và `/showcase`) giới thiệu phân cấp 3 loại dữ liệu (Sự thật Hệ thống, AI gợi ý, AI cần hỏi lại).
+  5. Viết tài liệu kiểm thử tương phản `docs/contrast.md` chứng minh 100% token đạt chuẩn WCAG 2.1 AA (tỷ lệ tương phản từ `4.6:1` đến `16.1:1`).
+- **Kiểm chứng**: `npm run lint` & `npm run build` sạch 100%, 0 lỗi TypeScript.

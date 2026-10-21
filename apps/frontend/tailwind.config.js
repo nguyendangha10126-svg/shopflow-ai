@@ -7,6 +7,10 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        heading: ['"Be Vietnam Pro"', 'Inter', 'sans-serif'],
+      },
       colors: {
         brand: {
           50: '#eef2ff',
