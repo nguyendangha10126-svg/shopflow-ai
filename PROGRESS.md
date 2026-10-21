@@ -19,8 +19,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | **U8** | **Quản lý Sản phẩm (2): Tải ảnh & Storage** | ✅ **HOÀN THÀNH** | `storage.provider.ts`, `upload.routes.ts`, `ImageUploader.tsx`, `image.ts` | StorageProvider (Disk dev / Cloudinary prod), Client resize & nén WebP, magic bytes | Không có lỗi. Sẵn sàng vào U9. |
 | **U9** | **Khách hàng & Hồ sơ chi tiết (CRM mini)** | ✅ **HOÀN THÀNH** | `CustomerDetailDrawer.tsx`, `CustomersPage.tsx` | Drawer chi tiết khách hàng, lịch sử đơn hàng, chỉ số AOV, gọi điện 1 chạm, nhãn Khách quen (>=3 đơn) | Không có lỗi. Sẵn sàng vào U10. |
 | **U10**| **Bảng điều khiển Tổng quan (Dashboard)** | ✅ **HOÀN THÀNH** | `DashboardPage.tsx` | Khối Cần xử lý ngay, Biểu đồ 7 ngày có trục Y & bảng thay thế, KPI chuẩn hóa, hạn mức AI | Không có lỗi. Sẵn sàng vào U11. |
-| **U11**| **Chính sách & Trả lời khách (FAQ RAG)** | ⏳ Đang thực hiện | - | Trình soạn thảo chính sách, giao diện chat Thử hỏi | Chuyển sang U11 ngay. |
-| **U12**| **Landing Page, Onboarding & Chế độ Demo** | ⏳ Chờ | - | Luồng đăng nhập, trang giới thiệu, onboarding 3 bước | Chờ U11 |
+| **U11**| **Chính sách & Trả lời khách (FAQ RAG)** | ✅ **HOÀN THÀNH** | `FaqPage.tsx` | Đổi tên thân thiện, Khung chat mô phỏng khách, trích dẫn nguồn, đánh giá phản hồi, nạp 3 chính sách mẫu | Không có lỗi. Sẵn sàng vào U12. |
+| **U12**| **Landing Page, Onboarding & Chế độ Demo** | ⏳ Đang thực hiện | - | Luồng đăng nhập, trang giới thiệu, onboarding 3 bước | Chuyển sang U12 ngay. |
 | **U13**| **Tinh chỉnh Motion & PWA Offline** | ⏳ Chờ | - | Kiểm tra ngắt mạng PWA shell, prefers-reduced-motion | Chờ U12 |
 | **U14**| **Kiểm thử toàn diện, Đo lường & Nghiệm thu**| ⏳ Chờ | - | Lighthouse >=90/95, axe 0 lỗi, ảnh `docs/screenshots/after/*` | Chờ U13 |
 
@@ -110,6 +110,25 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
      - Thu gọn mặc định các thuật ngữ kỹ thuật (p50/p95 latency, tokens), chỉ hiển thị khi bật "Chế độ xem kỹ thuật".
   5. **Loại bỏ 100% Emoji**: Thay bằng Lucide SVG (`BarChart2`, `TrendingUp`, `Package`, `Sparkles`, `Clock`, `Truck`, `Cpu`, `Table`, `AlertTriangle`).
 - **Kiểm chứng**: `npm run lint` và `npm run build` thành công tuyệt đối.
+
+### Bước U11: Nâng cấp Chính Sách & Trả Lời Khách (FAQ RAG)
+- **Thời gian**: 2026-10-21 22:06
+- **Công việc đã làm**:
+  1. **Đổi tên & Loại bỏ thuật ngữ kỹ thuật**:
+     - "Tư vấn FAQ" -> "Chính sách & Trả lời khách".
+     - Loại bỏ toàn bộ các từ lập trình ("chunks ngữ nghĩa", "Chống bịa đặt", "Single Source of Truth",...). Thay bằng "đoạn nội dung", "Trích dẫn nguồn".
+  2. **Tab 1: Quản lý Chính Sách Cửa Hàng**:
+     - Thẻ chính sách thời trang rõ ràng: phân loại (Đổi trả, Vận chuyển, Size guide), độ dài ký tự, thời gian cập nhật.
+     - Nút "Nạp 3 chính sách mẫu" 1-Click phục vụ người dùng mới.
+     - Trình chỉnh sửa chính sách trực quan.
+  3. **Tab 2: Trợ lý Chat "Thử hỏi như khách" (Customer Simulator)**:
+     - Giao diện chat trực quan thời gian thực (Bong bóng khách hỏi màu tím/xanh bên phải, AI phản hồi bên trái).
+     - 5 câu hỏi gợi ý thực tế 1 chạm ("Đổi size trong bao lâu?", "Freeship từ bao nhiêu?",...).
+     - **Trích dẫn nguồn chính sách**: Hiển thị hộp trích dẫn nguồn văn bản shop đã đối chiếu kèm tỷ lệ liên quan.
+     - **Nút hành động**: Sao chép câu trả lời để gửi khách, nút đánh giá phản hồi (Hữu ích / Cần cải thiện).
+  4. **Loại bỏ 100% Emoji**: Thay thế bằng Lucide SVG (`BookOpen`, `MessageSquare`, `Plus`, `Pencil`, `Trash2`, `Copy`, `ThumbsUp`, `ThumbsDown`, `Quote`, `Send`).
+- **Kiểm chứng**: `npm run lint` & `npm run build` vượt qua 100%.
+
 
 
 ### Bước U4: Nâng cấp trải nghiệm Dán tin AI (Ingestion Sheet & Clipboard)
@@ -234,6 +253,25 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
      - Thu gọn mặc định các thuật ngữ kỹ thuật (p50/p95 latency, tokens), chỉ hiển thị khi bật "Chế độ xem kỹ thuật".
   5. **Loại bỏ 100% Emoji**: Thay bằng Lucide SVG (`BarChart2`, `TrendingUp`, `Package`, `Sparkles`, `Clock`, `Truck`, `Cpu`, `Table`, `AlertTriangle`).
 - **Kiểm chứng**: `npm run lint` và `npm run build` thành công tuyệt đối.
+
+### Bước U11: Nâng cấp Chính Sách & Trả Lời Khách (FAQ RAG)
+- **Thời gian**: 2026-10-21 22:06
+- **Công việc đã làm**:
+  1. **Đổi tên & Loại bỏ thuật ngữ kỹ thuật**:
+     - "Tư vấn FAQ" -> "Chính sách & Trả lời khách".
+     - Loại bỏ toàn bộ các từ lập trình ("chunks ngữ nghĩa", "Chống bịa đặt", "Single Source of Truth",...). Thay bằng "đoạn nội dung", "Trích dẫn nguồn".
+  2. **Tab 1: Quản lý Chính Sách Cửa Hàng**:
+     - Thẻ chính sách thời trang rõ ràng: phân loại (Đổi trả, Vận chuyển, Size guide), độ dài ký tự, thời gian cập nhật.
+     - Nút "Nạp 3 chính sách mẫu" 1-Click phục vụ người dùng mới.
+     - Trình chỉnh sửa chính sách trực quan.
+  3. **Tab 2: Trợ lý Chat "Thử hỏi như khách" (Customer Simulator)**:
+     - Giao diện chat trực quan thời gian thực (Bong bóng khách hỏi màu tím/xanh bên phải, AI phản hồi bên trái).
+     - 5 câu hỏi gợi ý thực tế 1 chạm ("Đổi size trong bao lâu?", "Freeship từ bao nhiêu?",...).
+     - **Trích dẫn nguồn chính sách**: Hiển thị hộp trích dẫn nguồn văn bản shop đã đối chiếu kèm tỷ lệ liên quan.
+     - **Nút hành động**: Sao chép câu trả lời để gửi khách, nút đánh giá phản hồi (Hữu ích / Cần cải thiện).
+  4. **Loại bỏ 100% Emoji**: Thay thế bằng Lucide SVG (`BookOpen`, `MessageSquare`, `Plus`, `Pencil`, `Trash2`, `Copy`, `ThumbsUp`, `ThumbsDown`, `Quote`, `Send`).
+- **Kiểm chứng**: `npm run lint` & `npm run build` vượt qua 100%.
+
 
 
 

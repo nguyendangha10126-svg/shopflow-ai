@@ -1,13 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  BookOpen,
+  MessageSquare,
+  Sparkles,
+  Plus,
+  Pencil,
+  Trash2,
+  Copy,
+  Check,
+  Send,
+  ThumbsUp,
+  ThumbsDown,
+  Quote,
+  AlertTriangle,
+  RotateCcw,
+  FileText
+} from 'lucide-react';
 import { apiClient, ApiClientError } from '../services/api';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import Skeleton from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/Toast';
+import { formatRelativeTime } from '../utils/format';
 
 interface FaqDocumentItem {
   id: string;
@@ -40,6 +57,14 @@ interface FaqAnswerData {
   };
 }
 
+interface ChatMessage {
+  id: string;
+  sender: 'user' | 'ai';
+  text: string;
+  answerData?: FaqAnswerData;
+  timestamp: string;
+}
+
 export const FaqPage: React.FC = () => {
   const { showToast } = useToast();
 
@@ -56,11 +81,12 @@ export const FaqPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Hộp thoại RAG Ask AI
-  const [question, setQuestion] = useState('');
-  const [isAnswering, setIsAnswering] = useState(false);
-  const [answerData, setAnswerData] = useState<FaqAnswerData | null>(null);
-  const [queryError, setQueryError] = useState('');
+  // Hộp thoại Chat Thử hỏi như khách
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [inputQuestion, setInputQuestion] = useState('');
+  const [isAsking, setIsAsking] = useState(false);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [feedbackState, setFeedbackState] = useState<Record<string, 'up' | 'down'>>({});
 
   // 1. Tải danh sách tài liệu
   const fetchDocuments = useCallback(async () => {
@@ -99,17 +125,17 @@ export const FaqPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  // 4. Lưu tài liệu (Tạo mới hoặc Cập nhật)
+  // 4. Lưu tài liệu
   const handleSaveDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
     if (!docTitle.trim() || docTitle.trim().length < 2) {
-      setFormError('Tiêu đề tài liệu phải có ít nhất 2 ký tự');
+      setFormError('Tiêu đề chính sách phải có ít nhất 2 ký tự');
       return;
     }
     if (!docRawText.trim() || docRawText.trim().length < 10) {
-      setFormError('Nội dung tài liệu chính sách phải có ít nhất 10 ký tự');
+      setFormError('Nội dung chính sách phải có ít nhất 10 ký tự');
       return;
     }
 
@@ -121,14 +147,14 @@ export const FaqPage: React.FC = () => {
           content_type: docType,
           raw_text: docRawText.trim(),
         });
-        showToast('Đã cập nhật tài liệu chính sách thành công!', 'success');
+        showToast('Đã cập nhật chính sách thành công!', 'success');
       } else {
         await apiClient.post('/faq/documents', {
           title: docTitle.trim(),
           content_type: docType,
           raw_text: docRawText.trim(),
         });
-        showToast('Đã thêm tài liệu chính sách mới (Đã tự động cắt chunks)!', 'success');
+        showToast('Đã thêm chính sách mới thành công!', 'success');
       }
 
       setIsModalOpen(false);
@@ -146,83 +172,116 @@ export const FaqPage: React.FC = () => {
 
   // 5. Xóa tài liệu
   const handleDeleteDocument = async (id: string, title: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu chính sách "${title}"?`)) {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa chính sách "${title}"?`)) {
       return;
     }
 
     try {
       await apiClient.delete(`/faq/documents/${id}`);
-      showToast(`Đã xóa tài liệu "${title}"`, 'success');
+      showToast(`Đã xóa chính sách "${title}"`, 'success');
       fetchDocuments();
     } catch {
-      showToast('Không thể xóa tài liệu', 'error');
+      showToast('Không thể xóa chính sách', 'error');
     }
   };
 
-  // 6. Nạp 3 tài liệu mẫu 1-Click
+  // 6. Nạp 3 tài liệu mẫu
   const handleSeedSamples = async () => {
     try {
       await apiClient.post('/faq/seed-samples', {});
-      showToast('Đã nạp thành công 3 bộ chính sách mẫu tiếng Việt!', 'success');
+      showToast('Đã nạp 3 chính sách mẫu của shop thành công!', 'success');
       fetchDocuments();
     } catch {
       showToast('Lỗi khi nạp dữ liệu mẫu', 'error');
     }
   };
 
-  // 7. Hỏi AI Tư Vấn (RAG Query)
-  const handleAskAi = async (customQuestion?: string) => {
-    const q = (customQuestion || question).trim();
-    if (!q) {
-      setQueryError('Vui lòng nhập câu hỏi của khách hàng');
-      return;
-    }
+  // 7. Hỏi AI trong khung chat
+  const handleSendQuestion = async (customQ?: string) => {
+    const q = (customQ || inputQuestion).trim();
+    if (!q) return;
 
-    setQuestion(q);
-    setIsAnswering(true);
-    setQueryError('');
-    setAnswerData(null);
+    const userMsgId = `user_${Date.now()}`;
+    const newChat: ChatMessage[] = [
+      ...chatMessages,
+      {
+        id: userMsgId,
+        sender: 'user',
+        text: q,
+        timestamp: new Date().toISOString(),
+      },
+    ];
+    setChatMessages(newChat);
+    setInputQuestion('');
+    setIsAsking(true);
 
     try {
       const response = await apiClient.post<{ data: FaqAnswerData }>('/ai/faq-query', {
         question: q,
       });
-      setAnswerData(response.data);
-    } catch (err: any) {
-      if (err instanceof ApiClientError) {
-        setQueryError(err.message);
-      } else {
-        setQueryError('Không thể lấy câu trả lời từ AI. Vui lòng thử lại.');
-      }
+
+      const aiMsgId = `ai_${Date.now()}`;
+      setChatMessages([
+        ...newChat,
+        {
+          id: aiMsgId,
+          sender: 'ai',
+          text: response.data.answer,
+          answerData: response.data,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } catch {
+      showToast('Trợ lý AI tạm thời bận, vui lòng thử lại', 'error');
     } finally {
-      setIsAnswering(false);
+      setIsAsking(false);
     }
   };
 
-  // 8. Sao chép câu trả lời
-  const handleCopyAnswer = async () => {
-    if (!answerData?.answer) return;
+  // 8. Sao chép câu trả lời gửi khách
+  const handleCopy = async (text: string, msgId: string) => {
     try {
-      await navigator.clipboard.writeText(answerData.answer);
-      showToast('Đã sao chép câu trả lời vào Clipboard!', 'success');
+      await navigator.clipboard.writeText(text);
+      setCopiedMsgId(msgId);
+      showToast('Đã sao chép câu trả lời để gửi khách!', 'success');
+      setTimeout(() => setCopiedMsgId(null), 2000);
     } catch {
-      showToast('Không thể sao chép tự động', 'error');
+      showToast('Không thể sao chép văn bản', 'error');
+    }
+  };
+
+  const handleFeedback = (msgId: string, type: 'up' | 'down') => {
+    setFeedbackState((prev) => ({ ...prev, [msgId]: type }));
+    showToast(
+      type === 'up' ? 'Cảm ơn bạn đã đánh giá hữu ích!' : 'Cảm ơn góp ý, hệ thống sẽ học hỏi để cải thiện',
+      'success'
+    );
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'POLICIES':
+        return 'Đổi trả & Hoàn tiền';
+      case 'SHIPPING':
+        return 'Giao hàng & Phí ship';
+      case 'SIZE_GUIDE':
+        return 'Bảng size chuẩn';
+      default:
+        return 'Chính sách chung';
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* 1. Tiêu đề Trang */}
+      {/* 1. Header Trang & Tab chuyển đổi */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
-            <span>📚 Tư Vấn Chính Sách Shop (RAG FAQ)</span>
-            <Badge variant="system" size="sm">
-              Trích dẫn nguồn
-            </Badge>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center space-x-2.5">
+            <BookOpen className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+            <span>Chính Sách & Trả Lời Khách</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Quản lý cơ sở tri thức chính sách shop và hỏi đáp tự động với AI có trích dẫn nguồn xác thực
+            Quản lý quy định của shop và thử nghiệm trợ lý AI trả lời khách có đối chiếu nguồn tin
           </p>
         </div>
 
@@ -231,61 +290,69 @@ export const FaqPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('DOCUMENTS')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
               activeTab === 'DOCUMENTS'
                 ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            📚 Tài liệu chính sách ({documents.length})
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Tài liệu chính sách ({documents.length})</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('ASK_AI')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
               activeTab === 'ASK_AI'
                 ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            <span>💬 Hộp thoại thử nghiệm RAG</span>
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Thử hỏi như khách</span>
           </button>
         </div>
       </div>
 
       {/* ============================================================== */}
-      {/* TAB 1: QUẢN LÝ TÀI LIỆU CHÍNH SÁCH */}
+      {/* TAB 1: TÀI LIỆU CHÍNH SÁCH CỦA SHOP */}
       {/* ============================================================== */}
       {activeTab === 'DOCUMENTS' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-xs text-slate-500">
-              Văn bản chính sách sẽ được hệ thống tự động cắt thành các <b>chunks ngữ nghĩa</b> để tìm kiếm
-              khi khách hỏi.
+              Trợ lý AI sẽ đọc và đối chiếu các chính sách này khi trả lời thắc mắc của khách mua hàng.
             </p>
             <div className="flex items-center space-x-2">
               {documents.length === 0 && (
                 <Button variant="outline" size="sm" onClick={handleSeedSamples}>
-                  ⚡ Nạp 3 chính sách mẫu
+                  <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                  Nạp 3 chính sách mẫu
                 </Button>
               )}
-              <Button variant="primary" size="sm" onClick={handleOpenCreateModal}>
-                + Thêm tài liệu mới
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleOpenCreateModal}
+                className="bg-indigo-600 hover:bg-indigo-700 shadow-sm"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Thêm chính sách mới
               </Button>
             </div>
           </div>
 
           {isLoadingDocs ? (
-            <div className="space-y-3">
-              <Skeleton className="h-28 w-full rounded-xl" />
-              <Skeleton className="h-28 w-full rounded-xl" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-40 w-full rounded-xl" />
+              <Skeleton className="h-40 w-full rounded-xl" />
             </div>
           ) : documents.length === 0 ? (
             <EmptyState
               icon="📚"
               title="Chưa có tài liệu chính sách nào"
               description="Hãy thêm các quy định đổi trả, phí ship, thời gian giao hàng và bảng size để trợ lý AI có dữ liệu trả lời khách."
-              actionText="⚡ Nạp nhanh 3 chính sách mẫu"
+              actionText="Nạp nhanh 3 chính sách mẫu"
               onAction={handleSeedSamples}
             />
           ) : (
@@ -293,16 +360,17 @@ export const FaqPage: React.FC = () => {
               {documents.map((doc) => (
                 <Card
                   key={doc.id}
-                  className="hover:border-indigo-200 dark:hover:border-indigo-800 transition flex flex-col justify-between"
+                  className="hover:border-indigo-300 dark:hover:border-indigo-700 transition flex flex-col justify-between shadow-sm"
                 >
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                        {doc.title}
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span>{doc.title}</span>
                       </h3>
-                      <Badge variant="system" size="sm">
-                        {doc.content_type}
-                      </Badge>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/40 shrink-0">
+                        {getTypeLabel(doc.content_type)}
+                      </span>
                     </div>
 
                     <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-3 leading-relaxed">
@@ -311,24 +379,26 @@ export const FaqPage: React.FC = () => {
                   </div>
 
                   <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                    <span className="text-slate-400 font-medium">
-                      ✂️ {doc._count?.chunks ?? 1} chunks ngữ nghĩa
+                    <span className="text-slate-400 text-[11px]">
+                      {doc.raw_text.length.toLocaleString('vi-VN')} ký tự • {formatRelativeTime(doc.created_at)}
                     </span>
 
                     <div className="flex items-center space-x-2">
                       <button
                         type="button"
                         onClick={() => handleOpenEditModal(doc)}
-                        className="text-indigo-600 hover:underline font-semibold"
+                        className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline font-semibold text-xs"
                       >
-                        Sửa
+                        <Pencil className="w-3 h-3" />
+                        <span>Sửa</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteDocument(doc.id, doc.title)}
-                        className="text-rose-500 hover:underline font-semibold"
+                        className="inline-flex items-center gap-1 text-slate-400 hover:text-rose-600 font-medium text-xs transition-colors"
                       >
-                        Xóa
+                        <Trash2 className="w-3 h-3" />
+                        <span>Xóa</span>
                       </button>
                     </div>
                   </div>
@@ -340,27 +410,28 @@ export const FaqPage: React.FC = () => {
       )}
 
       {/* ============================================================== */}
-      {/* TAB 2: HỘP THOẠI THỬ NGHIỆM RAG (ASK AI) */}
+      {/* TAB 2: THỬ HỎI NHƯ KHÁCH (CHAT SIMULATOR) */}
       {/* ============================================================== */}
       {activeTab === 'ASK_AI' && (
-        <div className="space-y-6">
-          <Card className="space-y-4 border-purple-200 dark:border-purple-900/60 bg-gradient-to-br from-white to-purple-50/20 dark:from-slate-900 dark:to-purple-950/20">
-            <div className="space-y-1">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
-                <span>💬 Thử Nghiệm Trợ Lý Tư Vấn FAQ (RAG)</span>
-                <Badge variant="ai" size="sm">
-                  Chống bịa đặt
-                </Badge>
+        <div className="space-y-4">
+          <Card className="p-4 sm:p-5 border-purple-200 dark:border-purple-900/60 bg-gradient-to-br from-white to-purple-50/20 dark:from-slate-900 dark:to-purple-950/20 space-y-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-600" />
+                <span>Trợ Lý Trả Lời Khách Tự Động</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
+                  Đối chiếu chính sách
+                </span>
               </h2>
-              <p className="text-xs text-slate-500">
-                Nhập câu hỏi của khách hàng để xem AI trích xuất tài liệu chính sách và trả lời có trích dẫn nguồn
+              <p className="text-xs text-slate-500 mt-0.5">
+                Mô phỏng câu hỏi khách nhắn shop trên Zalo/Messenger để kiểm tra câu trả lời của AI
               </p>
             </div>
 
-            {/* Gợi ý câu hỏi mẫu */}
+            {/* Câu hỏi gợi ý 1 chạm */}
             <div className="space-y-1.5">
               <span className="text-[11px] font-semibold text-slate-400">
-                Câu hỏi gợi ý nhanh:
+                Câu hỏi thường gặp (bấm để hỏi ngay):
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {[
@@ -373,122 +444,147 @@ export const FaqPage: React.FC = () => {
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => handleAskAi(sampleQ)}
+                    onClick={() => handleSendQuestion(sampleQ)}
                     className="px-2.5 py-1 rounded-lg text-xs bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition"
                   >
-                    👉 {sampleQ}
+                    {sampleQ}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Ô nhập câu hỏi */}
+            {/* Khung chat hiển thị hội thoại */}
+            <div className="min-h-[220px] max-h-[420px] overflow-y-auto space-y-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+              {chatMessages.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 text-xs space-y-1">
+                  <MessageSquare className="w-8 h-8 opacity-40 mx-auto mb-2 text-indigo-500" />
+                  <p className="font-semibold text-slate-600 dark:text-slate-400">
+                    Chưa có tin nhắn nào
+                  </p>
+                  <p>Hãy chọn câu hỏi gợi ý bên trên hoặc nhập thắc mắc của khách vào ô bên dưới</p>
+                </div>
+              ) : (
+                chatMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col ${
+                      msg.sender === 'user' ? 'items-end' : 'items-start'
+                    }`}
+                  >
+                    {/* Bong bóng tin nhắn */}
+                    <div
+                      className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-3.5 text-xs sm:text-sm leading-relaxed ${
+                        msg.sender === 'user'
+                          ? 'bg-indigo-600 text-white rounded-br-none shadow-sm'
+                          : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-bl-none shadow-sm space-y-3'
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+
+                      {/* Trích dẫn nguồn nếu là câu trả lời của AI */}
+                      {msg.answerData && msg.answerData.sources.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1 text-xs">
+                          <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                            <Quote className="w-3 h-3 text-indigo-600" /> Căn cứ theo chính sách:
+                          </span>
+                          <div className="space-y-1">
+                            {msg.answerData.sources.map((src, i) => (
+                              <div
+                                key={i}
+                                className="p-2 rounded bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-[11px] text-slate-600 dark:text-slate-300"
+                              >
+                                <span className="font-semibold text-indigo-700 dark:text-indigo-300">
+                                  {src.document_title}:
+                                </span>{' '}
+                                <span className="italic">"{src.snippet}"</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Thao tác trên câu trả lời AI */}
+                      {msg.sender === 'ai' && (
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(msg.text, msg.id)}
+                            className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
+                          >
+                            {copiedMsgId === msg.id ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                            <span>Sao chép gửi khách</span>
+                          </button>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px]">Hữu ích?</span>
+                            <button
+                              type="button"
+                              onClick={() => handleFeedback(msg.id, 'up')}
+                              className={`p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                                feedbackState[msg.id] === 'up' ? 'text-emerald-600' : ''
+                              }`}
+                              title="Hữu ích"
+                            >
+                              <ThumbsUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleFeedback(msg.id, 'down')}
+                              className={`p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                                feedbackState[msg.id] === 'down' ? 'text-rose-600' : ''
+                              }`}
+                              title="Chưa đúng ý"
+                            >
+                              <ThumbsDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <span className="text-[10px] text-slate-400 mt-1 px-1">
+                      {msg.sender === 'user' ? 'Khách hỏi' : 'ShopFlow AI'}
+                    </span>
+                  </div>
+                ))
+              )}
+
+              {isAsking && (
+                <div className="flex items-start gap-2">
+                  <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 rounded-bl-none shadow-sm flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-600 animate-spin" />
+                    <span>Đang đối chiếu chính sách shop...</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Ô nhập câu hỏi gửi đi */}
             <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  label=""
-                  placeholder="Nhập câu hỏi của khách... (VD: Khách hỏi bao lâu thì nhận được hàng ở Hà Nội?)"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !isAnswering && handleAskAi()}
-                />
-              </div>
+              <input
+                type="text"
+                placeholder="Nhập câu hỏi của khách hàng... (Nhấn Enter để gửi)"
+                value={inputQuestion}
+                onChange={(e) => setInputQuestion(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !isAsking && handleSendQuestion()}
+                className="flex-1 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400"
+              />
               <Button
                 type="button"
                 variant="primary"
-                onClick={() => handleAskAi()}
-                isLoading={isAnswering}
-                className="bg-purple-600 hover:bg-purple-700 whitespace-nowrap"
+                onClick={() => handleSendQuestion()}
+                isLoading={isAsking}
+                className="bg-purple-600 hover:bg-purple-700 whitespace-nowrap shadow-sm"
               >
-                🚀 Hỏi AI
+                <Send className="w-4 h-4 mr-1.5" />
+                Hỏi AI
               </Button>
             </div>
-
-            {queryError && (
-              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 text-xs text-rose-700 dark:text-rose-300 rounded-lg">
-                ⚠️ {queryError}
-              </div>
-            )}
           </Card>
-
-          {/* Khung Hiển Thị Câu Trả Lời & Nguồn Trích Dẫn */}
-          {isAnswering ? (
-            <Card className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <span className="animate-spin text-purple-600">⚡</span>
-                <span className="text-xs font-bold text-slate-600">
-                  Đang tìm kiếm chính sách và sinh câu trả lời RAG...
-                </span>
-              </div>
-              <Skeleton className="h-20 w-full rounded-xl" />
-              <Skeleton className="h-14 w-full rounded-xl" />
-            </Card>
-          ) : answerData ? (
-            <Card className="space-y-4 border-indigo-200 dark:border-indigo-800">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className="text-base">🤖</span>
-                  <h3 className="text-xs font-bold uppercase text-slate-700 dark:text-slate-300 tracking-wider">
-                    Câu trả lời tư vấn cho khách:
-                  </h3>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyAnswer}
-                  className="text-xs h-7 py-0.5"
-                >
-                  📋 Sao chép câu trả lời
-                </Button>
-              </div>
-
-              {/* Nội dung câu trả lời */}
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-sans text-slate-800 dark:text-slate-200">
-                {answerData.answer}
-              </div>
-
-              {/* KHỐI NGUỒN TRÍCH DẪN (SOURCES CITATION) */}
-              <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center space-x-1.5">
-                  <span>📖 Nguồn tài liệu được AI đối chiếu ({answerData.sources.length}):</span>
-                </span>
-
-                {answerData.sources.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">
-                    Không tìm thấy tài liệu phù hợp trong cơ sở tri thức shop.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {answerData.sources.map((src, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 rounded-lg bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 text-xs space-y-1"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-indigo-900 dark:text-indigo-200">
-                            📌 {src.document_title}
-                          </span>
-                          <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold">
-                            {Math.round(src.relevance_score * 100)}% Độ liên quan
-                          </span>
-                        </div>
-                        <p className="text-slate-600 dark:text-slate-400 italic text-[11px] line-clamp-2">
-                          "{src.snippet}"
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Telemetry */}
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <span>Model: <b>{answerData.telemetry.model}</b></span>
-                <span>Độ trễ: <b>{answerData.telemetry.latency_ms} ms</b></span>
-              </div>
-            </Card>
-          ) : null}
         </div>
       )}
 
@@ -496,17 +592,19 @@ export const FaqPage: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => !isSubmitting && setIsModalOpen(false)}
-        title={editingDocId ? 'Cập Nhật Tài Liệu Chính Sách' : 'Thêm Tài Liệu Chính Sách Mới'}
+        title={editingDocId ? 'Cập Nhật Chính Sách Cửa Hàng' : 'Thêm Chính Sách Mới'}
+        maxWidth="max-w-2xl"
       >
         <form onSubmit={handleSaveDocument} className="space-y-4">
           {formError && (
-            <div className="p-3 bg-rose-50 dark:bg-rose-950/40 text-xs text-rose-700 dark:text-rose-300 rounded-lg">
-              ⚠️ {formError}
+            <div className="p-3 bg-rose-50 dark:bg-rose-950/40 text-xs text-rose-700 dark:text-rose-300 rounded-lg flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+              <span>{formError}</span>
             </div>
           )}
 
           <Input
-            label="Tiêu đề tài liệu chính sách"
+            label="Tiêu đề chính sách"
             placeholder="VD: Chính sách đổi trả & đổi size trong 7 ngày"
             value={docTitle}
             onChange={(e) => setDocTitle(e.target.value)}
@@ -514,7 +612,7 @@ export const FaqPage: React.FC = () => {
           />
 
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
               Phân loại chính sách
             </label>
             <select
@@ -530,23 +628,23 @@ export const FaqPage: React.FC = () => {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
               Nội dung chính sách chi tiết (Tối đa 10.000 ký tự)
             </label>
             <textarea
               rows={6}
               value={docRawText}
               onChange={(e) => setDocRawText(e.target.value)}
-              placeholder="Nhập nội dung quy định của shop... Hệ thống sẽ tự động cắt nhỏ thành các chunks để đối chiếu ngữ cảnh khi khách hỏi."
+              placeholder="Nhập nội dung quy định của shop để trợ lý AI tham chiếu trả lời khách..."
               className="w-full text-xs sm:text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 leading-relaxed"
               required
             />
             <p className="text-[11px] text-slate-400">
-              Ước tính: Khoảng <b>{Math.max(1, Math.ceil(docRawText.length / 400))}</b> chunks ngữ nghĩa.
+              Độ dài hiện tại: <b>{docRawText.length.toLocaleString('vi-VN')}</b> ký tự.
             </p>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100 dark:border-slate-800">
             <Button
               type="button"
               variant="outline"
@@ -555,8 +653,13 @@ export const FaqPage: React.FC = () => {
             >
               Hủy
             </Button>
-            <Button type="submit" variant="primary" isLoading={isSubmitting}>
-              {editingDocId ? 'Cập Nhật' : 'Lưu & Cắt Chunks'}
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={isSubmitting}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              {editingDocId ? 'Cập Nhật Chính Sách' : 'Lưu Chính Sách'}
             </Button>
           </div>
         </form>
