@@ -45,6 +45,7 @@
     "dotenv": "^16.4.5",
     "prettier": "^3.2.5",
     "prisma": "^5.14.0",
+    "puppeteer-core": "^25.15.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   },
