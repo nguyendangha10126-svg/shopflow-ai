@@ -14,8 +14,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | **U3** | **App Shell & Điều hướng (Mobile + Desktop)** | ✅ **HOÀN THÀNH** | `Sidebar.tsx`, `Topbar.tsx`, `MobileBottomBar.tsx`, `CommandPalette.tsx`, `AppLayout.tsx` | Phím tắt Ctrl+K, responsive mobile 390px, FAB tím giữa, sidebar collapse | Không có lỗi. Sẵn sàng vào U4. |
 | **U4** | **Dán tin AI (1): Ingestion & Clipboard** | ✅ **HOÀN THÀNH** | `MessageIngestionModal.tsx`, `Modal.tsx` | Clipboard API fallback, 3 tin mẫu 1 chạm, đếm 2.000 ký tự, Lucide icons | Không có lỗi. Sẵn sàng vào U5. |
 | **U5** | **Dán tin AI (2): Trình duyệt đơn nháp** | ✅ **HOÀN THÀNH** | `DraftOrderReviewModal.tsx` | Phân cấp 3 loại dữ liệu, tô sáng nguồn tin, sao chép câu hỏi khách, thanh hành động cố định | Không có lỗi. Sẵn sàng vào U6. |
-| **U6** | **Quản lý Đơn hàng & Drawer thao tác nhanh** | ⏳ Đang thực hiện | - | Drawer chi tiết, sao chép tin nhắn Zalo, gọi khách | Chuyển sang U6 ngay. |
-| **U7** | **Quản lý Sản phẩm (1): Lưới, Form, Undo** | ⏳ Chờ | - | Test thêm/sửa sản phẩm, xóa mềm có nút Hoàn tác | Chờ U6 |
+| **U6** | **Quản lý Đơn hàng & Drawer thao tác nhanh** | ✅ **HOÀN THÀNH** | `Drawer.tsx`, `OrderDetailDrawer.tsx`, `OrdersPage.tsx` | Drawer chi tiết, chip đếm trạng thái động, sao chép tin nhắn Zalo, gọi khách, modal xác nhận | Không có lỗi. Sẵn sàng vào U7. |
+| **U7** | **Quản lý Sản phẩm (1): Lưới, Form, Undo** | ⏳ Đang thực hiện | - | Test thêm/sửa sản phẩm, xóa mềm có nút Hoàn tác | Chuyển sang U7 ngay. |
 | **U8** | **Quản lý Sản phẩm (2): Tải ảnh & Storage** | ⏳ Chờ | - | Upload ảnh <5MB, client resize, ProductImage fallback | Chờ U7 |
 | **U9** | **Khách hàng & Hồ sơ chi tiết (CRM mini)** | ⏳ Chờ | - | Lịch sử đơn hàng của khách, nhãn Khách quen (>=3 đơn) | Chờ U8 |
 | **U10**| **Bảng điều khiển Tổng quan (Dashboard)** | ⏳ Chờ | - | Khối Cần xử lý ngay, Biểu đồ có trục/giá trị, KPI | Chờ U9 |
@@ -124,4 +124,27 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
      - 3 nút rõ ràng: "Bỏ qua" (thứ cấp), "Lưu nháp" (viền), "Chốt & Trừ kho" (chính - màu tím nổi bật), kèm trạng thái cảnh báo khi vượt tồn kho hoặc chưa chọn đủ phân loại.
 - **Kiểm chứng**:
   - `npm run lint` và `npm run build` không còn lỗi TypeScript nào.
+
+### Bước U6: Nâng cấp Quản lý Đơn hàng & Drawer thao tác nhanh
+- **Thời gian**: 2026-10-21 21:52
+- **Công việc đã làm**:
+  1. **Thành phần Drawer trượt phải chuyên nghiệp (`Drawer.tsx`)**:
+     - Hỗ trợ cuộn độc lập, khóa scroll thân trang, bẫy tiêu điểm (Focus trap) và đóng bằng phím ESC.
+  2. **Drawer chi tiết đơn hàng toàn diện (`OrderDetailDrawer.tsx`)**:
+     - Hiển thị đầy đủ thông tin: Mã đơn `#1001`, trạng thái, nguồn đơn (AI Dán tin vs Thủ công), thời gian tạo tương đối.
+     - **Sao chép tin nhắn Zalo / Messenger 1 chạm**: Tự động tổng hợp thông tin mã đơn, mặt hàng, tổng thanh toán, địa chỉ để gửi nhanh cho khách.
+     - **Gọi điện thoại 1 chạm (`tel:`)** và sao chép địa chỉ giao hàng tiện lợi.
+     - Danh sách chi tiết từng sản phẩm kèm SKU, phân loại và giá trị. Bảng tổng kết tài chính rõ ràng.
+  3. **Bộ lọc trạng thái tích hợp bộ đếm động (Dynamic Counters)**:
+     - Tất cả (8), Bản nháp (1), Đã xác nhận (3), Đang giao (2), Hoàn thành (2), Đã hủy (0) được tính trực tiếp từ dữ liệu hệ thống.
+  4. **Thẻ đơn hàng rút gọn & Nút hành động trực tiếp**:
+     - Cho phép click mở Drawer từ bất cứ đâu trên thẻ đơn.
+     - Nút "Chốt & Trừ kho", "Giao hàng", "Đã giao" hiển thị ngay trên từng dòng đơn theo đúng trạng thái.
+  5. **Hộp thoại xác nhận an toàn**:
+     - Modal xác nhận trước khi "Chốt & Trừ kho" để tránh bấm nhầm.
+     - Modal xác nhận hủy đơn hàng kèm nhập lý do và cam kết hoàn trả tồn kho.
+  6. **Loại bỏ 100% Emoji**: Thay thế toàn bộ bằng Lucide icons (`CheckCircle2`, `Truck`, `Clock`, `XCircle`, `Plus`, `Phone`, `Share2`, `Eye`,...).
+- **Kiểm chứng**:
+  - `npm run lint` và `npm run build` đều vượt qua 100% không cảnh báo.
+
 
