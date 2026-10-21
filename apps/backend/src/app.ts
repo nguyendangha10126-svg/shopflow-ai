@@ -23,22 +23,39 @@ const app = express();
 // 1. HTTP Security Headers
 app.use(helmet());
 
-// 2. CORS với Origin tường minh từ biến môi trường
+// 2. CORS với Origin linh hoạt cho phát triển và sản xuất
 const allowedOrigins = [
   env.FRONTEND_URL,
   'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:5175',
 ];
+
+const isDev = env.NODE_ENV !== 'production';
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS không cho phép truy cập từ nguồn: ${origin}`));
+      // Cho phép requests không có origin (curl, mobile apps nội bộ, postman, server-to-server)
+      if (!origin) {
+        return callback(null, true);
       }
+
+      // Cho phép các domain cấu hình sẵn
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Trong môi trường development: Cho phép mọi port localhost và 127.0.0.1
+      if (isDev && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      callback(new Error(`CORS không cho phép truy cập từ nguồn: ${origin}`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

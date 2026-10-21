@@ -91,3 +91,4 @@ export async function processImageFile(
     reader.readAsDataURL(file);
   });
 }
+

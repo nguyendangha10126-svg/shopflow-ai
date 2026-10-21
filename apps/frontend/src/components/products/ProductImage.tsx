@@ -64,3 +64,4 @@ export const ProductImage: React.FC<ProductImageProps> = ({
 };
 
 export default ProductImage;
+

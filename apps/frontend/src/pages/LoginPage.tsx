@@ -29,10 +29,33 @@ export const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleFillDemo = () => {
+  const handleLoginDemo = async () => {
     setEmail('owner@mayboutique.vn');
     setPassword('ShopFlow@123');
     setErrorMessage('');
+    setIsLoading(true);
+
+    try {
+      const response = await apiClient.post<LoginResponse>('/auth/login', {
+        email: 'owner@mayboutique.vn',
+        password: 'ShopFlow@123',
+      });
+
+      login(response.data.tokens.access_token, response.data.user);
+      showToast({
+        type: 'success',
+        message: `Đăng nhập thành công! Chào mừng ${response.data.user.full_name}`,
+      });
+      navigate('/orders');
+    } catch (err: any) {
+      if (err instanceof ApiClientError) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage('Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại backend trên cổng 5000');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,11 +146,12 @@ export const LoginPage: React.FC = () => {
               type="button"
               variant="outline"
               size="sm"
-              onClick={handleFillDemo}
+              onClick={handleLoginDemo}
+              disabled={isLoading}
               className="w-full text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 hover:bg-indigo-50 font-semibold"
             >
               <Sparkles className="w-4 h-4 mr-1.5" />
-              Điền tài khoản Demo (May Boutique)
+              Đăng nhập 1 chạm Demo (May Boutique)
             </Button>
           </div>
         </Card>

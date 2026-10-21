@@ -57,3 +57,4 @@ Tài liệu kiểm định độ tương phản màu sắc cho toàn bộ Token 
 2. **Focus Rings tương phản cao**: Tất cả các phần tử tương tác (`<button>`, `<input>`, `<a>`) đều sở hữu `focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2` với độ tương phản `5.9:1` phân biệt rõ ràng khi điều hướng bằng phím Tab.
 3. **Không dùng màu đơn thuần để định danh**: Mọi huy hiệu trạng thái đều đi kèm biểu tượng SVG Lucide đặc thù (`Lock`, `Sparkles`, `AlertCircle`, `CheckCircle2`) và nhãn văn bản tường minh.
 4. **Khu vực chạm cảm ứng**: Mọi nút bấm và liên kết điều hướng trên màn hình cảm ứng di động đều đạt kích thước tối thiểu `44 x 44px`.
+

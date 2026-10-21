@@ -25,6 +25,10 @@ export const errorHandler = (
     statusCode = 400;
     code = 'INVALID_JSON';
     message = 'Dữ liệu JSON gửi lên không đúng định dạng';
+  } else if (err.message && err.message.includes('CORS')) {
+    statusCode = 403;
+    code = 'CORS_FORBIDDEN';
+    message = err.message;
   } else if ((err as any).type === 'entity.too.large') {
     // Lỗi kích thước body vượt quá giới hạn
     statusCode = 413;

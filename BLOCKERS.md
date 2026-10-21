@@ -10,3 +10,4 @@
 - **Số điểm chặn nghiệp vụ**: **0**
 
 Hệ thống đã hoàn tất đầy đủ 15 hạng mục từ **U0 đến U14** theo đúng quy tắc tự chủ A1-A11. Toàn bộ logic bóc tách đơn hàng AI, kiểm soát tồn kho tức thời, quản lý khách hàng CRM, biểu đồ doanh thu và PWA hoạt động 100% trơn tru, không có bất kỳ lỗi chặn cứng nào.
+

@@ -8,6 +8,8 @@
     "apps/frontend"
   ],
   "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"BACKEND,FRONTEND\" -c \"blue.bold,magenta.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "clean:ports": "npx -y kill-port 5000 5173 5174 5175",
     "dev:backend": "npm run dev --workspace=apps/backend",
     "dev:frontend": "npm run dev --workspace=apps/frontend",
     "build:backend": "npm run build --workspace=apps/backend",
@@ -42,6 +44,7 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/node": "^20.11.0",
     "bcrypt": "^5.1.1",
+    "concurrently": "^10.0.6",
     "dotenv": "^16.4.5",
     "prettier": "^3.2.5",
     "prisma": "^5.14.0",

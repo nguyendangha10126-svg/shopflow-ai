@@ -162,3 +162,4 @@ export function validateImageMagicBytes(buffer: Buffer): string {
     'Định dạng ảnh không được hỗ trợ. Vui lòng chọn tệp JPEG, PNG hoặc WebP hợp lệ'
   );
 }
+

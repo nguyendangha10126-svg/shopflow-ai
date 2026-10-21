@@ -97,3 +97,4 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({ onOpenAiIngest
 };
 
 export default MobileBottomBar;
+
