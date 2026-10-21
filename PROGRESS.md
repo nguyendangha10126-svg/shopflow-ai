@@ -18,8 +18,8 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
 | **U7** | **Quản lý Sản phẩm (1): Lưới, Form, Undo** | ✅ **HOÀN THÀNH** | `ProductsPage.tsx`, `ProductImage.tsx`, `product.repository.ts`, `product.routes.ts` | Chế độ xem Lưới/Bảng, Thêm/Sửa sản phẩm, Xóa mềm có Hoàn tác (Undo) | Không có lỗi. Sẵn sàng vào U8. |
 | **U8** | **Quản lý Sản phẩm (2): Tải ảnh & Storage** | ✅ **HOÀN THÀNH** | `storage.provider.ts`, `upload.routes.ts`, `ImageUploader.tsx`, `image.ts` | StorageProvider (Disk dev / Cloudinary prod), Client resize & nén WebP, magic bytes | Không có lỗi. Sẵn sàng vào U9. |
 | **U9** | **Khách hàng & Hồ sơ chi tiết (CRM mini)** | ✅ **HOÀN THÀNH** | `CustomerDetailDrawer.tsx`, `CustomersPage.tsx` | Drawer chi tiết khách hàng, lịch sử đơn hàng, chỉ số AOV, gọi điện 1 chạm, nhãn Khách quen (>=3 đơn) | Không có lỗi. Sẵn sàng vào U10. |
-| **U10**| **Bảng điều khiển Tổng quan (Dashboard)** | ⏳ Đang thực hiện | - | Khối Cần xử lý ngay, Biểu đồ có trục/giá trị, KPI | Chuyển sang U10 ngay. |
-| **U11**| **Chính sách & Trả lời khách (FAQ RAG)** | ⏳ Chờ | - | Trình soạn thảo chính sách, giao diện chat Thử hỏi | Chờ U10 |
+| **U10**| **Bảng điều khiển Tổng quan (Dashboard)** | ✅ **HOÀN THÀNH** | `DashboardPage.tsx` | Khối Cần xử lý ngay, Biểu đồ 7 ngày có trục Y & bảng thay thế, KPI chuẩn hóa, hạn mức AI | Không có lỗi. Sẵn sàng vào U11. |
+| **U11**| **Chính sách & Trả lời khách (FAQ RAG)** | ⏳ Đang thực hiện | - | Trình soạn thảo chính sách, giao diện chat Thử hỏi | Chuyển sang U11 ngay. |
 | **U12**| **Landing Page, Onboarding & Chế độ Demo** | ⏳ Chờ | - | Luồng đăng nhập, trang giới thiệu, onboarding 3 bước | Chờ U11 |
 | **U13**| **Tinh chỉnh Motion & PWA Offline** | ⏳ Chờ | - | Kiểm tra ngắt mạng PWA shell, prefers-reduced-motion | Chờ U12 |
 | **U14**| **Kiểm thử toàn diện, Đo lường & Nghiệm thu**| ⏳ Chờ | - | Lighthouse >=90/95, axe 0 lỗi, ảnh `docs/screenshots/after/*` | Chờ U13 |
@@ -89,6 +89,28 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
   5. **Tích hợp luồng bóc tách AI toàn cục**:
      - Cho phép mở `MessageIngestionModal` từ bất kỳ vị trí nào trong ứng dụng (Topbar, Sidebar, Bottom Tab, Ctrl+K).
 - **Kiểm chứng**: `npm run lint` & `npm run build` thành công 100%.
+
+### Bước U10: Nâng cấp Bảng điều khiển Tổng quan (Dashboard Analytics)
+- **Thời gian**: 2026-10-21 22:03
+- **Công việc đã làm**:
+  1. **Khối "Cần xử lý ngay" (Urgent Action Card)**:
+     - Tự động phát hiện và cảnh báo đơn nháp chờ duyệt (`DRAFT`), đơn chờ giao (`CONFIRMED`), và các SKU sắp hết hàng ($\le 5$ chiếc) kèm nút điều hướng giải quyết 1 chạm.
+  2. **Đồng bộ hóa 100% KPI theo Single Source of Truth**:
+     - Doanh thu thuần: 3.200.000 ₫ (khớp đúng 5 đơn hàng đã chốt & giao).
+     - Tổng đơn hàng: 8 đơn (3 chốt • 2 giao • 2 xong • 1 nháp).
+     - Hiệu quả chốt đơn AI: 60% có tooltip giải thích rõ công thức tính toán minh bạch.
+     - Tồn kho hoạt động: 8 SKU, hiển thị số SKU sắp hết hàng.
+  3. **Biểu đồ Doanh thu 7 Ngày Chuẩn Mực**:
+     - Bổ sung thang đo trục Y rõ ràng (mốc tiền tệ tự động tính toán theo doanh thu cao nhất).
+     - Trục X nhãn thứ trong tuần, cột hiển thị hover/focus hiển thị chính xác số tiền và số đơn hàng.
+     - **Bảng dữ liệu thay thế (Accessible Data Table)**: Cho phép chuyển đổi nhanh giữa dạng biểu đồ cột và bảng số liệu hỗ trợ trợ năng WCAG.
+  4. **Thẻ Hạn Mức AI & Giám Sát Thân Thiện**:
+     - Tên model AI cấu hình tự động.
+     - Thanh tiến trình mức dùng AI trong tháng (`18 / 30 lượt`, còn lại `12 lượt`).
+     - Thu gọn mặc định các thuật ngữ kỹ thuật (p50/p95 latency, tokens), chỉ hiển thị khi bật "Chế độ xem kỹ thuật".
+  5. **Loại bỏ 100% Emoji**: Thay bằng Lucide SVG (`BarChart2`, `TrendingUp`, `Package`, `Sparkles`, `Clock`, `Truck`, `Cpu`, `Table`, `AlertTriangle`).
+- **Kiểm chứng**: `npm run lint` và `npm run build` thành công tuyệt đối.
+
 
 ### Bước U4: Nâng cấp trải nghiệm Dán tin AI (Ingestion Sheet & Clipboard)
 - **Thời gian**: 2026-10-21 21:45
@@ -191,6 +213,28 @@ Tài liệu theo dõi liên tục tiến độ nâng cấp ứng dụng ShopFlow
      - Lọc khách quen, khách mới, tìm kiếm tức thì theo tên hoặc số điện thoại.
      - Thay thế toàn bộ emoji bằng biểu tượng Lucide (`Users`, `Star`, `Phone`, `ShoppingBag`, `MapPin`, `CreditCard`).
 - **Kiểm chứng**: `npm run lint` & `npm run build` thành công 100%.
+
+### Bước U10: Nâng cấp Bảng điều khiển Tổng quan (Dashboard Analytics)
+- **Thời gian**: 2026-10-21 22:03
+- **Công việc đã làm**:
+  1. **Khối "Cần xử lý ngay" (Urgent Action Card)**:
+     - Tự động phát hiện và cảnh báo đơn nháp chờ duyệt (`DRAFT`), đơn chờ giao (`CONFIRMED`), và các SKU sắp hết hàng ($\le 5$ chiếc) kèm nút điều hướng giải quyết 1 chạm.
+  2. **Đồng bộ hóa 100% KPI theo Single Source of Truth**:
+     - Doanh thu thuần: 3.200.000 ₫ (khớp đúng 5 đơn hàng đã chốt & giao).
+     - Tổng đơn hàng: 8 đơn (3 chốt • 2 giao • 2 xong • 1 nháp).
+     - Hiệu quả chốt đơn AI: 60% có tooltip giải thích rõ công thức tính toán minh bạch.
+     - Tồn kho hoạt động: 8 SKU, hiển thị số SKU sắp hết hàng.
+  3. **Biểu đồ Doanh thu 7 Ngày Chuẩn Mực**:
+     - Bổ sung thang đo trục Y rõ ràng (mốc tiền tệ tự động tính toán theo doanh thu cao nhất).
+     - Trục X nhãn thứ trong tuần, cột hiển thị hover/focus hiển thị chính xác số tiền và số đơn hàng.
+     - **Bảng dữ liệu thay thế (Accessible Data Table)**: Cho phép chuyển đổi nhanh giữa dạng biểu đồ cột và bảng số liệu hỗ trợ trợ năng WCAG.
+  4. **Thẻ Hạn Mức AI & Giám Sát Thân Thiện**:
+     - Tên model AI cấu hình tự động.
+     - Thanh tiến trình mức dùng AI trong tháng (`18 / 30 lượt`, còn lại `12 lượt`).
+     - Thu gọn mặc định các thuật ngữ kỹ thuật (p50/p95 latency, tokens), chỉ hiển thị khi bật "Chế độ xem kỹ thuật".
+  5. **Loại bỏ 100% Emoji**: Thay bằng Lucide SVG (`BarChart2`, `TrendingUp`, `Package`, `Sparkles`, `Clock`, `Truck`, `Cpu`, `Table`, `AlertTriangle`).
+- **Kiểm chứng**: `npm run lint` và `npm run build` thành công tuyệt đối.
+
 
 
 
