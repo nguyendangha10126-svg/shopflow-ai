@@ -1,0 +1,1335 @@
+diff -ruN --strip-trailing-cr p/.env.example work/.env.example
+--- p/.env.example	2026-10-21 16:33:56.000000000 +0000
++++ work/.env.example	2026-10-25 03:33:03.888438659 +0000
+@@ -26,11 +26,17 @@
+ # DATABASE_URL="postgresql://shopflow_user:shopflow_secure_password_2026@postgres:5432/shopflow_db?schema=public"
+ 
+ # 4. Cấu hình Xác thực JWT (JSON Web Token)
+-# KHUYẾN NGHỊ: Sinh chuỗi ngẫu nhiên tối thiểu 32 ký tự trên Production
+-JWT_SECRET="shopflow_super_secret_jwt_key_2026_change_in_production_min32chars"
++# BẮT BUỘC đặt khóa riêng của bạn (>= 32 ký tự). Sinh bằng lệnh:
++#   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
++# Để trống: máy dev dùng khóa tạm (có cảnh báo); production sẽ DỪNG ứng dụng.
++JWT_SECRET=
+ JWT_EXPIRES_IN="15m"
+ JWT_REFRESH_EXPIRES_IN="7d"
+ 
++# Chế độ DEMO: chỉ bật khi trình diễn KHÔNG có CSDL. Khi bật, lỗi DB sẽ hiện dữ liệu mẫu thay vì báo lỗi.
++# TUYỆT ĐỐI để false khi chạy thật (production sẽ từ chối khởi động nếu bật).
++DEMO_MODE=false
++
+ # 5. Cấu hình Trợ lý Trí tuệ Nhân tạo (AI Provider)
+ # AI_PROVIDER: "mock" (chế độ giả lập không tốn tiền API) hoặc "gemini" (Google Gemini 1.5 Flash)
+ AI_PROVIDER="mock"
+diff -ruN --strip-trailing-cr p/KNOWN_ISSUES.md work/KNOWN_ISSUES.md
+--- p/KNOWN_ISSUES.md	2026-10-21 16:33:56.000000000 +0000
++++ work/KNOWN_ISSUES.md	2026-10-25 03:33:18.713146896 +0000
+@@ -1,3 +1,22 @@
++# KNOWN_ISSUES (cập nhật sau đợt sửa lỗi)
++
++## Đã sửa
++- Đăng nhập: không còn "đăng nhập thành công" khi DB lỗi. Tài khoản demo chỉ hoạt động khi `DEMO_MODE=true` và DB offline.
++- Dữ liệu giả: Dashboard/Đơn/Khách/Sản phẩm/FAQ không còn tự trả số giả khi DB lỗi. Mặc định trả 503 và giao diện hiện nút "Thử lại".
++- `JWT_SECRET`: không còn giá trị mặc định công khai; production bắt buộc đặt (>= 32 ký tự) và cấm `DEMO_MODE`.
++- Tổng chi tiêu/số đơn của khách: tính từ đơn thật (đã chốt, đang giao, hoàn thành).
++- Dashboard: gom doanh thu theo giờ Việt Nam; thêm số đơn hủy/trả để tổng khớp; tên model lấy từ cấu hình.
++- Token hết hạn sau 15 phút: frontend tự làm mới bằng refresh token (nguyên nhân thường gặp của lỗi "Không thể tải danh sách...").
++- FAQ: lỗi tải hiện ngay tại chỗ kèm nút Thử lại; lỗi thiếu bảng báo `DB_NOT_MIGRATED`.
++
++## Còn tồn tại / cần làm tiếp
++- Dọn bộ mã cũ ở thư mục gốc (`src/`, `public/`), chỉ giữ `apps/`.
++- Upload ảnh: chuyển sang multipart + re-encode (sharp) và xóa EXIF.
++- Tên model Gemini mặc định cần kiểm tra lại trên Google AI Studio.
++- Chưa chạy lại bộ test sau khi sửa (xem APPLY.md).
++
++---
++
+ # DANH SÁCH VẤN ĐỀ THEO DÕI (KNOWN_ISSUES.md)
+ 
+ **Dự án**: ShopFlow AI (Nâng cấp thương mại U0 - U14)  
+diff -ruN --strip-trailing-cr p/apps/backend/src/api/middlewares/error.middleware.ts work/apps/backend/src/api/middlewares/error.middleware.ts
+--- p/apps/backend/src/api/middlewares/error.middleware.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/api/middlewares/error.middleware.ts	2026-10-24 09:19:17.269771020 +0000
+@@ -2,6 +2,7 @@
+ import { AppError } from '../../core/errors/app-error';
+ import { logger } from '../../core/logger';
+ import { env } from '../../config/env';
++import { isDbConnectionError, isDbSchemaError } from '../../core/db-fallback';
+ 
+ export const errorHandler = (
+   err: Error,
+@@ -33,7 +34,19 @@
+     // Lỗi kích thước body vượt quá giới hạn
+     statusCode = 413;
+     code = 'PAYLOAD_TOO_LARGE';
+-    message = 'Kích thước dữ liệu gửi lên vượt quá giới hạn cho phép (1MB)';
++    message = 'Kích thước dữ liệu gửi lên vượt quá giới hạn cho phép';
++  } else if (isDbConnectionError(err)) {
++    // DB không kết nối được: báo 503 rõ ràng, KHÔNG trả dữ liệu giả
++    statusCode = 503;
++    code = 'DB_UNAVAILABLE';
++    message = 'Không kết nối được cơ sở dữ liệu. Vui lòng kiểm tra PostgreSQL đang chạy rồi thử lại';
++    logger.error({ err, url: req.originalUrl }, '🔌 [DB] Không kết nối được PostgreSQL');
++  } else if (isDbSchemaError(err)) {
++    // Thiếu bảng/cột: thường do chưa chạy migration
++    statusCode = 503;
++    code = 'DB_NOT_MIGRATED';
++    message = 'Cơ sở dữ liệu chưa được cập nhật cấu trúc. Hãy chạy: npm run prisma:deploy';
++    logger.error({ err, url: req.originalUrl }, '🗄️ [DB] Thiếu bảng/cột - chưa migrate');
+   } else {
+     // Lỗi hệ thống chưa được kiểm soát
+     logger.error(
+diff -ruN --strip-trailing-cr p/apps/backend/src/api/routes/ai.routes.ts work/apps/backend/src/api/routes/ai.routes.ts
+--- p/apps/backend/src/api/routes/ai.routes.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/api/routes/ai.routes.ts	2026-10-25 03:36:03.115165697 +0000
+@@ -68,6 +68,7 @@
+  */
+ router.post(
+   '/faq-query',
++  aiDraftRateLimiter,
+   validate({ body: faqQueryRequestSchema }),
+   async (req: Request, res: Response, next: NextFunction) => {
+     try {
+diff -ruN --strip-trailing-cr p/apps/backend/src/api/routes/upload.routes.ts work/apps/backend/src/api/routes/upload.routes.ts
+--- p/apps/backend/src/api/routes/upload.routes.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/api/routes/upload.routes.ts	2026-10-25 03:36:03.115578918 +0000
+@@ -1,4 +1,5 @@
+ import { Router, Request, Response, NextFunction } from 'express';
++import rateLimit from 'express-rate-limit';
+ import { authenticate } from '../middlewares/auth.middleware';
+ import { getStorageProvider, validateImageMagicBytes } from '../../services/storage/storage.provider';
+ import { BadRequestError } from '../../core/errors/app-error';
+@@ -6,9 +7,21 @@
+ const router = Router();
+ router.use(authenticate);
+ 
++// Tối đa 30 ảnh/phút cho mỗi người dùng (chống làm đầy ổ đĩa)
++const uploadLimiter = rateLimit({
++  windowMs: 60 * 1000,
++  max: 30,
++  standardHeaders: true,
++  legacyHeaders: false,
++  keyGenerator: (req: Request) => `upload_${req.user?.shopId || req.ip}_${req.user?.userId || ''}`,
++  message: {
++    error: { code: 'TOO_MANY_REQUESTS', message: 'Bạn tải ảnh quá nhanh. Vui lòng đợi một phút' },
++  },
++});
++
+ const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
+ 
+-router.post('/image', async (req: Request, res: Response, next: NextFunction) => {
++router.post('/image', uploadLimiter, async (req: Request, res: Response, next: NextFunction) => {
+   try {
+     const { data, name } = req.body;
+     if (!data || typeof data !== 'string') {
+@@ -31,7 +44,7 @@
+     const detectedMime = validateImageMagicBytes(buffer);
+ 
+     const storage = getStorageProvider();
+-    const result = await storage.upload(buffer, name || 'image', detectedMime);
++    const result = await storage.upload(buffer, name || 'image', detectedMime, req.user!.shopId);
+ 
+     res.status(200).json({
+       message: 'Tải ảnh lên thành công',
+diff -ruN --strip-trailing-cr p/apps/backend/src/app.ts work/apps/backend/src/app.ts
+--- p/apps/backend/src/app.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/app.ts	2026-10-25 03:36:03.114288393 +0000
+@@ -20,6 +20,12 @@
+ 
+ const app = express();
+ 
++// Đứng sau Nginx/Docker: phải tin proxy để req.ip là IP thật của khách (nếu không, mọi người dùng
++// bị tính chung 1 IP và dính rate limit cùng nhau).
++if (env.TRUST_PROXY > 0) {
++  app.set('trust proxy', env.TRUST_PROXY);
++}
++
+ // 1. HTTP Security Headers
+ app.use(helmet());
+ 
+@@ -64,8 +70,10 @@
+ );
+ 
+ // 3. Giới hạn kích thước Body (10MB) hỗ trợ tải ảnh an toàn
+-app.use(express.json({ limit: '10mb' }));
+-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
++// Chỉ route upload ảnh được nhận body lớn (ảnh base64). Mọi route khác giới hạn 200KB để chống tấn công làm đầy RAM.
++app.use('/api/v1/upload', express.json({ limit: '8mb' }));
++app.use(express.json({ limit: '200kb' }));
++app.use(express.urlencoded({ extended: true, limit: '200kb' }));
+ 
+ // Phục vụ tệp tĩnh tải lên cục bộ
+ app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+@@ -73,13 +81,13 @@
+ // 4. Rate Limiting toàn cục
+ const globalLimiter = rateLimit({
+   windowMs: 15 * 60 * 1000,
+-  max: 200,
++  max: 1000,
+   standardHeaders: true,
+   legacyHeaders: false,
+   message: {
+     error: {
+       code: 'TOO_MANY_REQUESTS',
+-      message: 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút',
++      message: 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng đợi vài phút rồi thử lại',
+     },
+   },
+ });
+diff -ruN --strip-trailing-cr p/apps/backend/src/config/env.ts work/apps/backend/src/config/env.ts
+--- p/apps/backend/src/config/env.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/config/env.ts	2026-10-25 03:36:03.114731067 +0000
+@@ -12,10 +12,15 @@
+   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+   FRONTEND_URL: z.string().default('http://localhost:5173'),
+   DATABASE_URL: z.string().min(1, 'DATABASE_URL không được để trống'),
+-  JWT_SECRET: z
+-    .string()
+-    .min(16, 'JWT_SECRET phải có độ dài tối thiểu 16 ký tự')
+-    .default('shopflow_super_secret_jwt_key_2026_change_in_production_min32chars'),
++  // KHÔNG có giá trị mặc định ở đây. Xem phần kiểm tra bên dưới.
++  JWT_SECRET: z.string().optional().default(''),
++  // Chế độ DEMO: chỉ dùng khi trình diễn không có CSDL. TUYỆT ĐỐI không bật ở production.
++  // Số lớp proxy phía trước backend (Nginx trong Docker = 1, chạy trực tiếp = 0)
++  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
++  DEMO_MODE: z
++    .enum(['true', 'false'])
++    .default('false')
++    .transform((v) => v === 'true'),
+   JWT_EXPIRES_IN: z.string().default('15m'),
+   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+   AI_PROVIDER: z.enum(['mock', 'gemini']).default('mock'),
+@@ -37,5 +42,29 @@
+   process.exit(1);
+ }
+ 
+-export const env = parsed.data;
+-export type Env = z.infer<typeof envSchema>;
++const DEV_ONLY_JWT_SECRET = 'dev_only_secret_khong_dung_o_production_0123456789abcdef';
++const data = parsed.data;
++
++if (data.NODE_ENV === 'production') {
++  const problems: string[] = [];
++  if (!data.JWT_SECRET || data.JWT_SECRET.length < 32) {
++    problems.push('JWT_SECRET bắt buộc phải đặt và dài tối thiểu 32 ký tự ở production');
++  }
++  if (data.DEMO_MODE) {
++    problems.push('DEMO_MODE=true bị cấm ở production (sẽ cho phép dữ liệu giả và đăng nhập demo)');
++  }
++  if (problems.length > 0) {
++    console.error('\n❌ [FAIL-FAST] CẤU HÌNH PRODUCTION KHÔNG AN TOÀN:');
++    problems.forEach((m) => console.error(` • ${m}`));
++    process.exit(1);
++  }
++} else if (!data.JWT_SECRET || data.JWT_SECRET.length < 16) {
++  console.warn('⚠️  JWT_SECRET chưa đặt hoặc quá ngắn: đang dùng khóa tạm chỉ dành cho máy dev.');
++}
++
++export const env = {
++  ...data,
++  JWT_SECRET:
++    data.JWT_SECRET && data.JWT_SECRET.length >= 16 ? data.JWT_SECRET : DEV_ONLY_JWT_SECRET,
++};
++export type Env = typeof env;
+diff -ruN --strip-trailing-cr p/apps/backend/src/core/db-fallback.ts work/apps/backend/src/core/db-fallback.ts
+--- p/apps/backend/src/core/db-fallback.ts	1970-01-01 00:00:00.000000000 +0000
++++ work/apps/backend/src/core/db-fallback.ts	2026-10-24 09:18:53.930291762 +0000
+@@ -0,0 +1,32 @@
++import { env } from '../config/env';
++
++/**
++ * Lỗi do KHÔNG kết nối được tới PostgreSQL (DB tắt, sai DATABASE_URL, mạng...).
++ */
++export function isDbConnectionError(err: any): boolean {
++  if (!err) return false;
++  const msg: string = typeof err.message === 'string' ? err.message : '';
++  return (
++    err.name === 'PrismaClientInitializationError' ||
++    msg.includes("Can't reach database server") ||
++    err.code === 'P1001' ||
++    err.code === 'P1002' ||
++    err.code === 'P1017'
++  );
++}
++
++/**
++ * Lỗi do DB chưa được migrate (thiếu bảng/cột). Hay gặp khi quên chạy prisma migrate.
++ */
++export function isDbSchemaError(err: any): boolean {
++  return !!err && (err.code === 'P2021' || err.code === 'P2022');
++}
++
++/**
++ * Chỉ cho phép dùng dữ liệu mẫu trong bộ nhớ khi DEMO_MODE=true VÀ DB thật sự không kết nối được.
++ * Mặc định (DEMO_MODE=false) hàm này luôn trả false => lỗi được ném ra và API trả 503,
++ * giao diện hiện thông báo lỗi thật thay vì số liệu giả.
++ */
++export function shouldUseDemoFallback(err: any): boolean {
++  return env.DEMO_MODE === true && isDbConnectionError(err);
++}
+diff -ruN --strip-trailing-cr p/apps/backend/src/repositories/customer.repository.ts work/apps/backend/src/repositories/customer.repository.ts
+--- p/apps/backend/src/repositories/customer.repository.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/repositories/customer.repository.ts	2026-10-24 09:19:53.078949875 +0000
+@@ -1,4 +1,4 @@
+-import { Prisma } from '@prisma/client';
++import { Prisma, OrderStatus } from '@prisma/client';
+ import { prisma } from '../db';
+ import {
+   CreateCustomerDto,
+@@ -6,6 +6,7 @@
+   CustomerQueryDto,
+ } from '../api/validators/customer.validator';
+ import { NotFoundError, ConflictError } from '../core/errors/app-error';
++import { shouldUseDemoFallback } from '../core/db-fallback';
+ 
+ export class CustomerRepository {
+   private static serializeCustomer(c: any) {
+@@ -15,6 +16,39 @@
+     };
+   }
+ 
++
++  /**
++   * Gắn số đơn đã mua và tổng chi tiêu TÍNH TRỰC TIẾP TỪ BẢNG ĐƠN HÀNG.
++   * (Hai cột total_orders / total_spent_vnd trong bảng customers không được cập nhật ở đâu cả,
++   *  nên không dùng. Tính từ đơn thật luôn khớp với trang Đơn hàng.)
++   * Quy ước: chỉ tính đơn ĐÃ CHỐT trở đi (xác nhận / đang giao / hoàn thành).
++   */
++  private static async attachOrderStats(shopId: string, customers: any[]) {
++    if (customers.length === 0) return customers;
++    const ids = customers.map((c) => c.id);
++    const grouped = await prisma.order.groupBy({
++      by: ['customer_id'],
++      where: {
++        shop_id: shopId,
++        customer_id: { in: ids },
++        deleted_at: null,
++        status: { in: [OrderStatus.CONFIRMED, OrderStatus.SHIPPING, OrderStatus.DELIVERED] },
++      },
++      _count: { _all: true },
++      _sum: { total_vnd: true },
++    });
++    const byCustomer = new Map(
++      grouped.map((g) => [
++        g.customer_id as string,
++        { orders: g._count._all, spent: g._sum.total_vnd ?? 0 },
++      ])
++    );
++    return customers.map((c) => {
++      const st = byCustomer.get(c.id);
++      return { ...c, total_orders: st?.orders ?? 0, total_spent_vnd: st?.spent ?? 0 };
++    });
++  }
++
+   public static async findMany(shopId: string, query: CustomerQueryDto) {
+     const { page, limit, search } = query;
+     const skip = (page - 1) * limit;
+@@ -43,8 +77,9 @@
+         prisma.customer.count({ where }),
+       ]);
+ 
++      const withStats = await this.attachOrderStats(shopId, items);
+       return {
+-        items: items.map(this.serializeCustomer),
++        items: withStats.map(this.serializeCustomer),
+         pagination: {
+           page,
+           limit,
+@@ -53,10 +88,7 @@
+         },
+       };
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const allMockCustomers = [
+           {
+             id: 'cust-001',
+@@ -160,12 +192,10 @@
+         throw new NotFoundError('Không tìm thấy khách hàng hoặc khách hàng đã bị xóa');
+       }
+ 
+-      return this.serializeCustomer(customer);
++      const [withStats] = await this.attachOrderStats(shopId, [customer]);
++      return this.serializeCustomer(withStats);
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const result = await this.findMany(shopId, { page: 1, limit: 100 });
+         const found = result.items.find((c: any) => c.id === customerId);
+         if (!found) throw new NotFoundError('Không tìm thấy khách hàng hoặc khách hàng đã bị xóa');
+diff -ruN --strip-trailing-cr p/apps/backend/src/repositories/order.repository.ts work/apps/backend/src/repositories/order.repository.ts
+--- p/apps/backend/src/repositories/order.repository.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/repositories/order.repository.ts	2026-10-25 03:36:03.113647210 +0000
+@@ -3,6 +3,7 @@
+ import { OrderQueryDto } from '../api/validators/order.validator';
+ import { NotFoundError, ConflictError } from '../core/errors/app-error';
+ import { OrderStateMachine } from '../core/domain/order-state-machine';
++import { shouldUseDemoFallback } from '../core/db-fallback';
+ 
+ export interface PreparedOrderItem {
+   product_variant_id: string;
+@@ -78,10 +79,7 @@
+         },
+       };
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const allMockOrders = [
+           {
+             id: 'ord-1001',
+@@ -367,10 +365,7 @@
+ 
+       return order;
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const result = await this.findMany(shopId, { page: 1, limit: 100 });
+         const found = result.items.find(
+           (o: any) => o.id === orderId || String(o.order_number) === orderId
+@@ -579,6 +574,23 @@
+         );
+       }
+ 
++      // "Giành quyền" xác nhận đơn một cách nguyên tử: nếu có 2 yêu cầu bấm Chốt cùng lúc,
++      // chỉ 1 yêu cầu cập nhật được (count = 1), yêu cầu còn lại bị từ chối -> không trừ kho 2 lần.
++      const claimed = await tx.order.updateMany({
++        where: {
++          id: orderId,
++          shop_id: shopId,
++          status: { in: [OrderStatus.DRAFT, OrderStatus.PENDING_REVIEW] },
++        },
++        data: { status: OrderStatus.CONFIRMED },
++      });
++      if (claimed.count === 0) {
++        throw new ConflictError(
++          'Đơn hàng vừa được xử lý ở nơi khác. Vui lòng tải lại danh sách đơn',
++          'ORDER_ALREADY_PROCESSED'
++        );
++      }
++
+       // Trừ kho có điều kiện từng món hàng
+       for (const item of order.items) {
+         const updated = await tx.$executeRaw`
+@@ -641,6 +653,22 @@
+         throw new ConflictError('Đơn hàng đã bị hủy trước đó', 'ORDER_ALREADY_CANCELLED');
+       }
+ 
++      // Đơn đã giao/đã trả không được hủy (nếu hủy sẽ cộng kho sai). Phải theo đúng quy trình trạng thái.
++      OrderStateMachine.validateTransition(order.status, OrderStatus.CANCELLED);
++
++      // Giành quyền hủy một cách nguyên tử, chỉ khi trạng thái vẫn đúng như vừa đọc
++      // -> không hoàn kho 2 lần khi bấm Hủy hai lần, không hoàn sai khi trạng thái vừa đổi.
++      const claimed = await tx.order.updateMany({
++        where: { id: orderId, shop_id: shopId, status: order.status },
++        data: { status: OrderStatus.CANCELLED },
++      });
++      if (claimed.count === 0) {
++        throw new ConflictError(
++          'Trạng thái đơn hàng vừa thay đổi. Vui lòng tải lại rồi thử lại',
++          'ORDER_STATUS_CHANGED'
++        );
++      }
++
+       // Nếu đơn đang ở trạng thái đã trừ kho (CONFIRMED, SHIPPING) -> Hoàn trả tồn kho
+       const wasStockDeducted = OrderStateMachine.isStockDeducted(order.status);
+       if (wasStockDeducted) {
+diff -ruN --strip-trailing-cr p/apps/backend/src/repositories/product.repository.ts work/apps/backend/src/repositories/product.repository.ts
+--- p/apps/backend/src/repositories/product.repository.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/repositories/product.repository.ts	2026-10-24 09:18:53.933505746 +0000
+@@ -7,6 +7,7 @@
+   ProductQueryDto,
+ } from '../api/validators/product.validator';
+ import { NotFoundError, ConflictError } from '../core/errors/app-error';
++import { shouldUseDemoFallback } from '../core/db-fallback';
+ 
+ // In-memory fallback dataset cho chế độ offline/dev
+ export const mockProductsList: Array<any> = [
+@@ -256,10 +257,7 @@
+         },
+       };
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         let filtered = mockProductsList.filter((p) => !p.deleted_at);
+ 
+         if (search) {
+@@ -314,10 +312,7 @@
+ 
+       return product;
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const p = mockProductsList.find((item) => item.id === productId && !item.deleted_at);
+         if (!p) {
+           throw new NotFoundError('Không tìm thấy sản phẩm hoặc sản phẩm đã bị xóa');
+@@ -382,10 +377,7 @@
+         };
+       });
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         // In-memory fallback
+         const newId = `prod-${Date.now()}`;
+         const newProduct = {
+@@ -441,10 +433,7 @@
+         },
+       });
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const p = mockProductsList.find((item) => item.id === productId);
+         if (!p) throw new NotFoundError('Không tìm thấy sản phẩm');
+         if (dto.name !== undefined) p.name = dto.name;
+@@ -483,10 +472,7 @@
+         });
+       });
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const p = mockProductsList.find((item) => item.id === productId);
+         if (!p) throw new NotFoundError('Không tìm thấy sản phẩm');
+         p.deleted_at = new Date();
+@@ -524,10 +510,7 @@
+         });
+       });
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const p = mockProductsList.find((item) => item.id === productId);
+         if (p) {
+           p.deleted_at = null;
+@@ -570,10 +553,7 @@
+         },
+       });
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         for (const p of mockProductsList) {
+           const v = p.variants.find((item: any) => item.id === variantId && !item.deleted_at);
+           if (v) {
+diff -ruN --strip-trailing-cr p/apps/backend/src/services/auth.service.ts work/apps/backend/src/services/auth.service.ts
+--- p/apps/backend/src/services/auth.service.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/services/auth.service.ts	2026-10-24 09:19:37.790536478 +0000
+@@ -4,6 +4,8 @@
+ import { RegisterDto, LoginDto } from '../api/validators/auth.validator';
+ import { JwtService, TokenPair } from '../core/auth/jwt.service';
+ import { ConflictError, UnauthorizedError, NotFoundError } from '../core/errors/app-error';
++import { env } from '../config/env';
++import { shouldUseDemoFallback } from '../core/db-fallback';
+ 
+ export interface UserResponse {
+   id: string;
+@@ -20,6 +22,14 @@
+   tokens: TokenPair;
+ }
+ 
++// Hằng số cho chế độ DEMO offline (chỉ có tác dụng khi DEMO_MODE=true và DB không kết nối được)
++const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
++const DEMO_SHOP_ID = '00000000-0000-0000-0000-000000000002';
++const DEMO_EMAIL = 'owner@mayboutique.vn';
++const DEMO_PASSWORD = 'ShopFlow@123';
++// Hash bcrypt giả (sinh lúc khởi động) để thời gian xử lý đồng đều khi email không tồn tại
++const DUMMY_BCRYPT_HASH = bcrypt.hashSync('khong-phai-mat-khau-that', 10);
++
+ export class AuthService {
+   public static async register(dto: RegisterDto): Promise<AuthResponse> {
+     try {
+@@ -93,10 +103,7 @@
+       };
+     } catch (err: any) {
+       if (err instanceof ConflictError) throw err;
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         // Dự phòng Offline / Demo mode khi CSDL chưa bật
+         const demoUserId = '00000000-0000-0000-0000-000000000001';
+         const demoShopId = '00000000-0000-0000-0000-000000000002';
+@@ -124,49 +131,21 @@
+   }
+ 
+   public static async login(dto: LoginDto): Promise<AuthResponse> {
+-    const demoUserId = '00000000-0000-0000-0000-000000000001';
+-    const demoShopId = '00000000-0000-0000-0000-000000000002';
+-
+-    // 0. Hỗ trợ đăng nhập tức thì cho tài khoản Demo May Boutique ngay cả khi DB chưa bật / chưa seed
+-    if (dto.email === 'owner@mayboutique.vn' && dto.password === 'ShopFlow@123') {
+-      const tokens = JwtService.generateTokens({
+-        userId: demoUserId,
+-        shopId: demoShopId,
+-        role: UserRole.OWNER,
+-        email: 'owner@mayboutique.vn',
+-      });
+-      return {
+-        user: {
+-          id: demoUserId,
+-          shop_id: demoShopId,
+-          email: 'owner@mayboutique.vn',
+-          full_name: 'May Boutique Owner',
+-          role: UserRole.OWNER,
+-          is_active: true,
+-          created_at: new Date(),
+-        },
+-        tokens,
+-      };
+-    }
+-
+     try {
+       // 1. Tìm người dùng theo email
+       const user = await prisma.user.findUnique({
+         where: { email: dto.email },
+       });
+ 
+-      // 2. Chống timing attack: nếu không tìm thấy user vẫn thực hiện một so sánh giả lập
+-      if (!user || !user.is_active) {
+-        throw new UnauthorizedError('Email hoặc mật khẩu không chính xác');
+-      }
++      // 2. Chống timing attack: nếu không có user vẫn so sánh với một hash giả
++      const hashToCompare = user?.password_hash ?? DUMMY_BCRYPT_HASH;
++      const isPasswordValid = await bcrypt.compare(dto.password, hashToCompare);
+ 
+-      // 3. So khớp mật khẩu với hash trong CSDL
+-      const isPasswordValid = await bcrypt.compare(dto.password, user.password_hash);
+-      if (!isPasswordValid) {
++      if (!user || !user.is_active || !isPasswordValid) {
+         throw new UnauthorizedError('Email hoặc mật khẩu không chính xác');
+       }
+ 
+-      // 4. Cấp cặp Token mới
++      // 3. Cấp cặp Token mới
+       const tokens = JwtService.generateTokens({
+         userId: user.id,
+         shopId: user.shop_id,
+@@ -187,30 +166,44 @@
+         tokens,
+       };
+     } catch (err: any) {
++      // Chỉ lỗi xác thực mới được trả về như 401. Mọi lỗi khác (DB tắt, lỗi truy vấn...)
++      // KHÔNG BAO GIỜ được phép biến thành "đăng nhập thành công".
+       if (err instanceof UnauthorizedError) throw err;
+-      
+-      // Dự phòng Offline / Demo mode khi CSDL chưa bật hoặc gặp lỗi kết nối
+-      const tokens = JwtService.generateTokens({
+-        userId: demoUserId,
+-        shopId: demoShopId,
+-        role: UserRole.OWNER,
+-        email: dto.email || 'owner@mayboutique.vn',
+-      });
+-      return {
+-        user: {
+-          id: demoUserId,
+-          shop_id: demoShopId,
+-          email: dto.email || 'owner@mayboutique.vn',
+-          full_name: 'May Boutique Owner (Demo)',
+-          role: UserRole.OWNER,
+-          is_active: true,
+-          created_at: new Date(),
+-        },
+-        tokens,
+-      };
++
++      // Chế độ DEMO (chỉ khi DEMO_MODE=true và DB không kết nối được):
++      // cho phép đúng 1 tài khoản demo cố định để trình diễn offline.
++      if (
++        shouldUseDemoFallback(err) &&
++        dto.email === DEMO_EMAIL &&
++        dto.password === DEMO_PASSWORD
++      ) {
++        return AuthService.buildDemoAuth();
++      }
++      throw err;
+     }
+   }
+ 
++  private static buildDemoAuth(): AuthResponse {
++    const tokens = JwtService.generateTokens({
++      userId: DEMO_USER_ID,
++      shopId: DEMO_SHOP_ID,
++      role: UserRole.OWNER,
++      email: DEMO_EMAIL,
++    });
++    return {
++      user: {
++        id: DEMO_USER_ID,
++        shop_id: DEMO_SHOP_ID,
++        email: DEMO_EMAIL,
++        full_name: 'May Boutique Owner (Demo)',
++        role: UserRole.OWNER,
++        is_active: true,
++        created_at: new Date(),
++      },
++      tokens,
++    };
++  }
++
+   public static async refresh(refreshToken: string): Promise<TokenPair> {
+     const decoded = JwtService.verifyRefreshToken(refreshToken);
+ 
+@@ -223,6 +216,7 @@
+         throw new UnauthorizedError('Tài khoản người dùng không tồn tại hoặc đã bị khóa');
+       }
+ 
++      // Lấy role/shop từ DB (không tin dữ liệu cũ trong token)
+       return JwtService.generateTokens({
+         userId: user.id,
+         shopId: user.shop_id,
+@@ -231,12 +225,10 @@
+       });
+     } catch (err: any) {
+       if (err instanceof UnauthorizedError) throw err;
+-      return JwtService.generateTokens({
+-        userId: decoded.userId,
+-        shopId: decoded.shopId,
+-        role: UserRole.OWNER,
+-        email: 'owner@mayboutique.vn',
+-      });
++      if (shouldUseDemoFallback(err) && decoded.userId === DEMO_USER_ID) {
++        return AuthService.buildDemoAuth().tokens;
++      }
++      throw err;
+     }
+   }
+ 
+@@ -266,48 +258,32 @@
+       });
+ 
+       if (!user) {
+-        if (userId === '00000000-0000-0000-0000-000000000001') {
+-          return {
+-            id: userId,
+-            shop_id: '00000000-0000-0000-0000-000000000002',
+-            email: 'owner@mayboutique.vn',
+-            full_name: 'May Boutique Owner',
+-            role: UserRole.OWNER,
+-            is_active: true,
+-            created_at: new Date(),
+-            updated_at: new Date(),
+-            shop: {
+-              id: '00000000-0000-0000-0000-000000000002',
+-              name: 'May Boutique',
+-              phone: '0988888888',
+-              is_active: true,
+-              created_at: new Date(),
+-            },
+-          };
+-        }
+         throw new NotFoundError('Không tìm thấy thông tin người dùng');
+       }
+ 
+       return user;
+     } catch (err: any) {
+       if (err instanceof NotFoundError) throw err;
+-      return {
+-        id: userId,
+-        shop_id: '00000000-0000-0000-0000-000000000002',
+-        email: 'owner@mayboutique.vn',
+-        full_name: 'May Boutique Owner',
+-        role: UserRole.OWNER,
+-        is_active: true,
+-        created_at: new Date(),
+-        updated_at: new Date(),
+-        shop: {
+-          id: '00000000-0000-0000-0000-000000000002',
+-          name: 'May Boutique',
+-          phone: '0988888888',
++      if (shouldUseDemoFallback(err) && userId === DEMO_USER_ID) {
++        return {
++          id: DEMO_USER_ID,
++          shop_id: DEMO_SHOP_ID,
++          email: DEMO_EMAIL,
++          full_name: 'May Boutique Owner (Demo)',
++          role: UserRole.OWNER,
+           is_active: true,
+           created_at: new Date(),
+-        },
+-      };
++          updated_at: new Date(),
++          shop: {
++            id: DEMO_SHOP_ID,
++            name: 'May Boutique',
++            phone: '0988888888',
++            is_active: true,
++            created_at: new Date(),
++          },
++        };
++      }
++      throw err;
+     }
+   }
+ }
+diff -ruN --strip-trailing-cr p/apps/backend/src/services/dashboard.service.ts work/apps/backend/src/services/dashboard.service.ts
+--- p/apps/backend/src/services/dashboard.service.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/services/dashboard.service.ts	2026-10-24 09:19:53.078386995 +0000
+@@ -2,6 +2,33 @@
+ import { prisma } from '../db';
+ import { logger } from '../core/logger';
+ import { env } from '../config/env';
++import { shouldUseDemoFallback } from '../core/db-fallback';
++
++const VN_TZ = 'Asia/Ho_Chi_Minh';
++
++/** Trả về 'YYYY-MM-DD' của một thời điểm theo GIỜ VIỆT NAM (không phụ thuộc múi giờ máy chủ). */
++function vnDateKey(d: Date): string {
++  return new Intl.DateTimeFormat('en-CA', {
++    timeZone: VN_TZ,
++    year: 'numeric',
++    month: '2-digit',
++    day: '2-digit',
++  }).format(d);
++}
++
++/** Danh sách 7 ngày gần nhất (cũ -> mới) theo giờ Việt Nam, kèm nhãn 'd/m'. */
++function last7VnDays(): Array<{ key: string; label: string }> {
++  const [y, m, d] = vnDateKey(new Date()).split('-').map(Number);
++  const out: Array<{ key: string; label: string }> = [];
++  for (let i = 6; i >= 0; i--) {
++    const dt = new Date(Date.UTC(y, m - 1, d - i));
++    out.push({
++      key: dt.toISOString().slice(0, 10),
++      label: `${dt.getUTCDate()}/${dt.getUTCMonth() + 1}`,
++    });
++  }
++  return out;
++}
+ 
+ export interface DashboardSummary {
+   kpis: {
+@@ -47,9 +74,6 @@
+     try {
+       const now = new Date();
+       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+-      const sevenDaysAgo = new Date();
+-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+-      sevenDaysAgo.setHours(0, 0, 0, 0);
+ 
+       // 1. Truy vấn đồng thời các bảng thống kê với index shop_id
+       const [
+@@ -164,18 +188,15 @@
+ 
+       // 3. Tính toán Biểu đồ 7 ngày gần nhất (Time Series)
+       const dailyMap = new Map<string, { revenue: number; count: number; label: string }>();
+-      for (let i = 0; i < 7; i++) {
+-        const d = new Date(sevenDaysAgo);
+-        d.setDate(d.getDate() + i);
+-        const key = d.toISOString().split('T')[0];
+-        const label = `${d.getDate()}/${d.getMonth() + 1}`;
+-        dailyMap.set(key, { revenue: 0, count: 0, label });
++      for (const day of last7VnDays()) {
++        dailyMap.set(day.key, { revenue: 0, count: 0, label: day.label });
+       }
+ 
+       orders.forEach((o) => {
+-        const orderDate = new Date(o.created_at).toISOString().split('T')[0];
+-        if (dailyMap.has(orderDate)) {
+-          const entry = dailyMap.get(orderDate)!;
++        // Gom theo NGÀY GIỜ VIỆT NAM để đơn lúc 00:30 sáng không bị tính sang ngày hôm trước
++        const orderDate = vnDateKey(new Date(o.created_at));
++        const entry = dailyMap.get(orderDate);
++        if (entry) {
+           entry.count++;
+           if (
+             o.status === OrderStatus.CONFIRMED ||
+@@ -242,7 +263,7 @@
+         orders_by_source,
+         revenue_trend_7d,
+         ai_usage: {
+-          model_name: env.GEMINI_MODEL ? `Google ${env.GEMINI_MODEL}` : 'Google Gemini 1.5 Flash',
++          model_name: env.AI_PROVIDER === 'gemini' ? env.GEMINI_MODEL : 'Chế độ mô phỏng (mock)',
+           used_this_month,
+           monthly_limit,
+           remaining,
+@@ -256,9 +277,13 @@
+         },
+       };
+     } catch (err: any) {
+-      logger.warn({ error: err.message }, 'Lỗi khi tổng hợp báo cáo Dashboard - Trả về dữ liệu mẫu an toàn');
+-      // Trả về dữ liệu mô phỏng an toàn nếu CSDL offline
+-      return this.getMockSummary();
++      // Chỉ trả dữ liệu mẫu khi DEMO_MODE=true và DB thật sự offline.
++      // Ngược lại ném lỗi để API trả 503 và giao diện hiện nút "Thử tải lại" (không hiện số giả).
++      if (shouldUseDemoFallback(err)) {
++        logger.warn({ error: err.message }, 'DEMO_MODE: DB offline - trả dữ liệu Dashboard mẫu');
++        return this.getMockSummary();
++      }
++      throw err;
+     }
+   }
+ 
+diff -ruN --strip-trailing-cr p/apps/backend/src/services/faq.service.ts work/apps/backend/src/services/faq.service.ts
+--- p/apps/backend/src/services/faq.service.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/services/faq.service.ts	2026-10-24 09:19:17.270225038 +0000
+@@ -4,6 +4,7 @@
+ import { CreateFaqDocumentDto, UpdateFaqDocumentDto } from '../api/validators/faq.validator';
+ import { AIService } from './ai.service';
+ import { env } from '../config/env';
++import { shouldUseDemoFallback } from '../core/db-fallback';
+ 
+ export interface RelevantChunkResult {
+   document_id: string;
+@@ -174,10 +175,7 @@
+         return doc;
+       });
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const newDoc = {
+           id: `faq-doc-${Date.now()}`,
+           shop_id: shopId,
+@@ -217,10 +215,7 @@
+         orderBy: { created_at: 'desc' },
+       });
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         return this.demoDocuments;
+       }
+       throw err;
+@@ -250,10 +245,7 @@
+ 
+       return doc;
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const doc = this.demoDocuments.find((d) => d.id === id);
+         if (!doc) throw new NotFoundError('Không tìm thấy tài liệu chính sách');
+         return doc;
+@@ -309,10 +301,7 @@
+         return updated;
+       });
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         const idx = this.demoDocuments.findIndex((d) => d.id === id);
+         if (idx === -1) throw new NotFoundError('Không tìm thấy tài liệu để cập nhật');
+         const existing = this.demoDocuments[idx];
+@@ -356,10 +345,7 @@
+ 
+       return { success: true };
+     } catch (err: any) {
+-      if (
+-        err.message?.includes("Can't reach database server") ||
+-        err.name === 'PrismaClientInitializationError'
+-      ) {
++      if (shouldUseDemoFallback(err)) {
+         this.demoDocuments = this.demoDocuments.filter((d) => d.id !== id);
+         return { success: true };
+       }
+@@ -428,7 +414,8 @@
+         .sort((a, b) => b.relevance_score - a.relevance_score)
+         .slice(0, topK);
+     } catch (err: any) {
+-      logger.warn({ error: err.message }, 'Lỗi khi tìm kiếm FAQ chunks từ CSDL - Dùng fallback bộ nhớ đệm');
++      if (!shouldUseDemoFallback(err)) throw err;
++      logger.warn({ error: err.message }, 'DEMO_MODE: DB offline - tìm FAQ trong dữ liệu mẫu bộ nhớ');
+       const fallbackChunks: any[] = [];
+       this.demoDocuments.forEach((doc) => {
+         if (doc.is_active && doc.chunks) {
+diff -ruN --strip-trailing-cr p/apps/backend/src/services/storage/storage.provider.ts work/apps/backend/src/services/storage/storage.provider.ts
+--- p/apps/backend/src/services/storage/storage.provider.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/backend/src/services/storage/storage.provider.ts	2026-10-25 03:36:03.115923516 +0000
+@@ -1,5 +1,6 @@
+ import fs from 'fs';
+ import path from 'path';
++import crypto from 'crypto';
+ import { BadRequestError } from '../../core/errors/app-error';
+ 
+ export interface UploadResult {
+@@ -10,7 +11,7 @@
+ }
+ 
+ export interface StorageProvider {
+-  upload(fileBuffer: Buffer, fileName: string, mimeType: string): Promise<UploadResult>;
++  upload(fileBuffer: Buffer, fileName: string, mimeType: string, shopId?: string): Promise<UploadResult>;
+   delete(publicId: string): Promise<boolean>;
+ }
+ 
+@@ -31,17 +32,23 @@
+   public async upload(
+     fileBuffer: Buffer,
+     fileName: string,
+-    mimeType: string
++    mimeType: string,
++    shopId?: string
+   ): Promise<UploadResult> {
+     const ext = mimeType.split('/')[1] || 'jpg';
+-    const uniqueId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
++    const uniqueId = `img_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+     const safeName = `${uniqueId}.${ext}`;
+-    const targetPath = path.join(this.uploadDir, safeName);
++    // Lưu theo thư mục của từng shop. Chỉ nhận UUID để chống ghi ra ngoài thư mục (path traversal)
++    const shopFolder =
++      shopId && /^[0-9a-fA-F-]{36}$/.test(shopId) ? shopId : 'shared';
++    const targetDir = path.join(this.uploadDir, shopFolder);
++    const targetPath = path.join(targetDir, safeName);
+ 
+     try {
++      await fs.promises.mkdir(targetDir, { recursive: true });
+       await fs.promises.writeFile(targetPath, fileBuffer);
+       return {
+-        url: `/uploads/${safeName}`,
++        url: `/uploads/${shopFolder}/${safeName}`,
+         publicId: uniqueId,
+         format: ext,
+         bytes: fileBuffer.length,
+@@ -60,11 +67,17 @@
+ 
+   public async delete(publicId: string): Promise<boolean> {
+     try {
+-      const files = await fs.promises.readdir(this.uploadDir);
+-      const match = files.find((f) => f.startsWith(publicId));
+-      if (match) {
+-        await fs.promises.unlink(path.join(this.uploadDir, match));
+-        return true;
++      if (!/^img_[A-Za-z0-9_]+$/.test(publicId)) return false;
++      const folders = await fs.promises.readdir(this.uploadDir, { withFileTypes: true });
++      for (const folder of folders) {
++        if (!folder.isDirectory()) continue;
++        const dir = path.join(this.uploadDir, folder.name);
++        const files = await fs.promises.readdir(dir);
++        const match = files.find((f) => f.startsWith(publicId));
++        if (match) {
++          await fs.promises.unlink(path.join(dir, match));
++          return true;
++        }
+       }
+     } catch {
+       // Ignore
+@@ -73,50 +86,9 @@
+   }
+ }
+ 
+-export class CloudinaryStorageProvider implements StorageProvider {
+-  private cloudName: string | undefined;
+-  private apiKey: string | undefined;
+-
+-  constructor() {
+-    this.cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+-    this.apiKey = process.env.CLOUDINARY_API_KEY;
+-  }
+-
+-  public async upload(
+-    fileBuffer: Buffer,
+-    fileName: string,
+-    mimeType: string
+-  ): Promise<UploadResult> {
+-    if (!this.cloudName || !this.apiKey) {
+-      // Fallback to local storage if credentials are not configured
+-      const local = new LocalStorageProvider();
+-      return local.upload(fileBuffer, fileName, mimeType);
+-    }
+-
+-    // When configured with Cloudinary credentials, integrate direct upload API
+-    const ext = mimeType.split('/')[1] || 'jpg';
+-    const publicId = `shopflow_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+-    return {
+-      url: `https://res.cloudinary.com/${this.cloudName}/image/upload/v1/${publicId}.${ext}`,
+-      publicId,
+-      format: ext,
+-      bytes: fileBuffer.length,
+-    };
+-  }
+-
+-  public async delete(_publicId: string): Promise<boolean> {
+-    return true;
+-  }
+-}
+-
+ export function getStorageProvider(): StorageProvider {
+-  if (
+-    process.env.NODE_ENV === 'production' &&
+-    process.env.CLOUDINARY_CLOUD_NAME &&
+-    process.env.CLOUDINARY_API_KEY
+-  ) {
+-    return new CloudinaryStorageProvider();
+-  }
++  // Hiện chỉ có lưu trên đĩa của máy chủ. Muốn dùng Cloudinary/S3/R2 cần viết provider thật
++  // (bản cũ chỉ tạo đường link giả, ảnh sẽ không hiển thị được nên đã được gỡ).
+   return new LocalStorageProvider();
+ }
+ 
+diff -ruN --strip-trailing-cr p/apps/frontend/src/contexts/AuthContext.tsx work/apps/frontend/src/contexts/AuthContext.tsx
+--- p/apps/frontend/src/contexts/AuthContext.tsx	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/frontend/src/contexts/AuthContext.tsx	2026-10-24 09:20:20.085134184 +0000
+@@ -19,7 +19,7 @@
+   token: string | null;
+   isAuthenticated: boolean;
+   isLoading: boolean;
+-  login: (token: string, user: User) => void;
++  login: (token: string, user: User, refreshToken?: string) => void;
+   logout: () => void;
+ }
+ 
+@@ -56,8 +56,19 @@
+     checkAuth();
+   }, []);
+ 
+-  const login = (newToken: string, newUser: User) => {
++  // Khi phiên hết hạn hoàn toàn (refresh token cũng hỏng) -> đưa người dùng về trạng thái đăng xuất
++  useEffect(() => {
++    const onExpired = () => {
++      setToken(null);
++      setUser(null);
++    };
++    window.addEventListener('sf:auth-expired', onExpired);
++    return () => window.removeEventListener('sf:auth-expired', onExpired);
++  }, []);
++
++  const login = (newToken: string, newUser: User, refreshToken?: string) => {
+     localStorage.setItem('sf_token', newToken);
++    if (refreshToken) localStorage.setItem('sf_refresh', refreshToken);
+     localStorage.setItem('sf_user', JSON.stringify(newUser));
+     setToken(newToken);
+     setUser(newUser);
+@@ -65,6 +76,7 @@
+ 
+   const logout = () => {
+     localStorage.removeItem('sf_token');
++    localStorage.removeItem('sf_refresh');
+     localStorage.removeItem('sf_user');
+     setToken(null);
+     setUser(null);
+diff -ruN --strip-trailing-cr p/apps/frontend/src/pages/DashboardPage.tsx work/apps/frontend/src/pages/DashboardPage.tsx
+--- p/apps/frontend/src/pages/DashboardPage.tsx	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/frontend/src/pages/DashboardPage.tsx	2026-10-24 09:20:20.087485720 +0000
+@@ -307,6 +307,14 @@
+               <span className="text-indigo-600">{summary.orders_by_status.DELIVERED || 0} xong</span>
+               <span>•</span>
+               <span className="text-amber-600">{summary.orders_by_status.DRAFT || 0} nháp</span>
++              {((summary.orders_by_status.CANCELLED || 0) + (summary.orders_by_status.RETURNED || 0)) > 0 && (
++                <>
++                  <span>•</span>
++                  <span className="text-rose-600">
++                    {(summary.orders_by_status.CANCELLED || 0) + (summary.orders_by_status.RETURNED || 0)} hủy/trả
++                  </span>
++                </>
++              )}
+             </div>
+           </div>
+         </Card>
+diff -ruN --strip-trailing-cr p/apps/frontend/src/pages/FaqPage.tsx work/apps/frontend/src/pages/FaqPage.tsx
+--- p/apps/frontend/src/pages/FaqPage.tsx	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/frontend/src/pages/FaqPage.tsx	2026-10-24 09:20:20.087063534 +0000
+@@ -71,6 +71,7 @@
+   const [activeTab, setActiveTab] = useState<'DOCUMENTS' | 'ASK_AI'>('DOCUMENTS');
+   const [documents, setDocuments] = useState<FaqDocumentItem[]>([]);
+   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
++  const [docsError, setDocsError] = useState<string | null>(null);
+ 
+   // Modal Thêm / Sửa tài liệu
+   const [isModalOpen, setIsModalOpen] = useState(false);
+@@ -91,11 +92,15 @@
+   // 1. Tải danh sách tài liệu
+   const fetchDocuments = useCallback(async () => {
+     setIsLoadingDocs(true);
++    setDocsError(null);
+     try {
+       const response = await apiClient.get<{ data: FaqDocumentItem[] }>('/faq/documents');
+       setDocuments(response.data);
+-    } catch {
+-      showToast('Không thể tải danh sách tài liệu chính sách', 'error');
++    } catch (err: any) {
++      if (err?.name === 'AbortError') return;
++      const msg = err?.message || 'Không thể tải danh sách tài liệu chính sách';
++      setDocsError(msg);
++      showToast(msg, 'error');
+     } finally {
+       setIsLoadingDocs(false);
+     }
+@@ -347,6 +352,23 @@
+               <Skeleton className="h-40 w-full rounded-xl" />
+               <Skeleton className="h-40 w-full rounded-xl" />
+             </div>
++          ) : docsError ? (
++            <div
++              role="alert"
++              className="flex flex-col items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-8 text-center dark:border-rose-900 dark:bg-rose-950/30"
++            >
++              <AlertTriangle className="h-8 w-8 text-rose-500" />
++              <div>
++                <p className="font-semibold text-rose-700 dark:text-rose-300">
++                  Chưa tải được danh sách chính sách
++                </p>
++                <p className="mt-1 text-sm text-rose-600 dark:text-rose-400">{docsError}</p>
++              </div>
++              <Button variant="outline" size="sm" onClick={fetchDocuments}>
++                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
++                Thử lại
++              </Button>
++            </div>
+           ) : documents.length === 0 ? (
+             <EmptyState
+               icon="📚"
+diff -ruN --strip-trailing-cr p/apps/frontend/src/pages/LandingPage.tsx work/apps/frontend/src/pages/LandingPage.tsx
+--- p/apps/frontend/src/pages/LandingPage.tsx	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/frontend/src/pages/LandingPage.tsx	2026-10-24 09:20:20.086019898 +0000
+@@ -24,7 +24,7 @@
+         email: 'owner@mayboutique.vn',
+         password: 'ShopFlow@123',
+       });
+-      login(response.data.tokens.access_token, response.data.user);
++      login(response.data.tokens.access_token, response.data.user, response.data.tokens.refresh_token);
+       showToast('Đã vào chế độ trải nghiệm demo May Boutique!', 'success');
+       navigate('/');
+     } catch {
+diff -ruN --strip-trailing-cr p/apps/frontend/src/pages/LoginPage.tsx work/apps/frontend/src/pages/LoginPage.tsx
+--- p/apps/frontend/src/pages/LoginPage.tsx	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/frontend/src/pages/LoginPage.tsx	2026-10-24 09:20:20.085425287 +0000
+@@ -41,7 +41,7 @@
+         password: 'ShopFlow@123',
+       });
+ 
+-      login(response.data.tokens.access_token, response.data.user);
++      login(response.data.tokens.access_token, response.data.user, response.data.tokens.refresh_token);
+       showToast({
+         type: 'success',
+         message: `Đăng nhập thành công! Chào mừng ${response.data.user.full_name}`,
+@@ -69,7 +69,7 @@
+         password,
+       });
+ 
+-      login(response.data.tokens.access_token, response.data.user);
++      login(response.data.tokens.access_token, response.data.user, response.data.tokens.refresh_token);
+       showToast({
+         type: 'success',
+         message: `Đăng nhập thành công! Chào mừng ${response.data.user.full_name}`,
+diff -ruN --strip-trailing-cr p/apps/frontend/src/pages/RegisterPage.tsx work/apps/frontend/src/pages/RegisterPage.tsx
+--- p/apps/frontend/src/pages/RegisterPage.tsx	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/frontend/src/pages/RegisterPage.tsx	2026-10-24 09:20:20.086441832 +0000
+@@ -34,7 +34,7 @@
+         password,
+       });
+ 
+-      login(response.data.tokens.access_token, response.data.user);
++      login(response.data.tokens.access_token, response.data.user, response.data.tokens.refresh_token);
+       showToast({
+         type: 'success',
+         message: 'Tạo cửa hàng thành công! Chào mừng bạn gia nhập ShopFlow AI.',
+diff -ruN --strip-trailing-cr p/apps/frontend/src/services/api.ts work/apps/frontend/src/services/api.ts
+--- p/apps/frontend/src/services/api.ts	2026-10-21 16:33:56.000000000 +0000
++++ work/apps/frontend/src/services/api.ts	2026-10-24 09:20:20.084765654 +0000
+@@ -26,8 +26,47 @@
+ 
+ const BASE_URL = '/api/v1';
+ 
++// Access token chỉ sống ~15 phút. Khi hết hạn, tự dùng refresh token để xin token mới (1 lần),
++// rồi gọi lại yêu cầu cũ. Nhờ vậy người dùng không bị "văng" lỗi sau 15 phút.
++let refreshPromise: Promise<boolean> | null = null;
++
++async function tryRefreshToken(): Promise<boolean> {
++  const refreshToken = localStorage.getItem('sf_refresh');
++  if (!refreshToken) return false;
++  if (!refreshPromise) {
++    refreshPromise = (async () => {
++      try {
++        const res = await fetch(`${BASE_URL}/auth/refresh`, {
++          method: 'POST',
++          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
++          body: JSON.stringify({ refresh_token: refreshToken }),
++        });
++        if (!res.ok) return false;
++        const json = await res.json();
++        const tokens = json?.data?.tokens;
++        if (!tokens?.access_token) return false;
++        localStorage.setItem('sf_token', tokens.access_token);
++        if (tokens.refresh_token) localStorage.setItem('sf_refresh', tokens.refresh_token);
++        return true;
++      } catch {
++        return false;
++      } finally {
++        refreshPromise = null;
++      }
++    })();
++  }
++  return refreshPromise;
++}
++
++function expireSession() {
++  localStorage.removeItem('sf_token');
++  localStorage.removeItem('sf_refresh');
++  localStorage.removeItem('sf_user');
++  window.dispatchEvent(new Event('sf:auth-expired'));
++}
++
+ export const apiClient = {
+-  async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
++  async request<T>(endpoint: string, options: RequestOptions = {}, isRetry = false): Promise<T> {
+     const { params, headers, ...restOptions } = options;
+ 
+     let url = `${BASE_URL}${endpoint}`;
+@@ -58,10 +97,12 @@
+         headers: defaultHeaders,
+       });
+ 
+-      // Nếu 401 Unauthorized -> Xóa token hết hạn
+-      if (response.status === 401) {
+-        localStorage.removeItem('sf_token');
+-        localStorage.removeItem('sf_user');
++      // 401: thử làm mới token một lần rồi gọi lại. Không áp dụng cho chính các API đăng nhập/làm mới.
++      if (response.status === 401 && !isRetry && !endpoint.startsWith('/auth/login') && !endpoint.startsWith('/auth/register') && !endpoint.startsWith('/auth/refresh')) {
++        if (await tryRefreshToken()) {
++          return this.request<T>(endpoint, options, true);
++        }
++        expireSession();
+       }
+ 
+       const contentType = response.headers.get('content-type');
+diff -ruN --strip-trailing-cr p/docker-compose.yml work/docker-compose.yml
+--- p/docker-compose.yml	2026-10-21 16:33:56.000000000 +0000
++++ work/docker-compose.yml	2026-10-25 03:36:09.136763130 +0000
+@@ -47,7 +47,9 @@
+       NODE_ENV: production
+       PORT: 5000
+       DATABASE_URL: postgresql://${POSTGRES_USER:-shopflow_user}:${POSTGRES_PASSWORD:-shopflow_password}@postgres:5432/${POSTGRES_DB:-shopflow_db}?schema=public
+-      JWT_SECRET: ${JWT_SECRET:-shopflow_super_secret_jwt_key_2026_change_in_production_min32chars}
++      JWT_SECRET: ${JWT_SECRET:?Hay dat JWT_SECRET (>= 32 ky tu) trong file .env}
++      DEMO_MODE: "false"
++      TRUST_PROXY: "1"
+       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+       AI_PROVIDER: ${AI_PROVIDER:-mock}

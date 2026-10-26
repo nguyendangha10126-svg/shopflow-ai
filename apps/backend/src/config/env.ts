@@ -12,10 +12,15 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FRONTEND_URL: z.string().default('http://localhost:5173'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL không được để trống'),
-  JWT_SECRET: z
-    .string()
-    .min(16, 'JWT_SECRET phải có độ dài tối thiểu 16 ký tự')
-    .default('shopflow_super_secret_jwt_key_2026_change_in_production_min32chars'),
+  // KHÔNG có giá trị mặc định ở đây. Xem phần kiểm tra bên dưới.
+  JWT_SECRET: z.string().optional().default(''),
+  // Chế độ DEMO: chỉ dùng khi trình diễn không có CSDL. TUYỆT ĐỐI không bật ở production.
+  // Số lớp proxy phía trước backend (Nginx trong Docker = 1, chạy trực tiếp = 0)
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
+  DEMO_MODE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   AI_PROVIDER: z.enum(['mock', 'gemini']).default('mock'),
@@ -37,5 +42,29 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const env = parsed.data;
-export type Env = z.infer<typeof envSchema>;
+const DEV_ONLY_JWT_SECRET = 'dev_only_secret_khong_dung_o_production_0123456789abcdef';
+const data = parsed.data;
+
+if (data.NODE_ENV === 'production') {
+  const problems: string[] = [];
+  if (!data.JWT_SECRET || data.JWT_SECRET.length < 32) {
+    problems.push('JWT_SECRET bắt buộc phải đặt và dài tối thiểu 32 ký tự ở production');
+  }
+  if (data.DEMO_MODE) {
+    problems.push('DEMO_MODE=true bị cấm ở production (sẽ cho phép dữ liệu giả và đăng nhập demo)');
+  }
+  if (problems.length > 0) {
+    console.error('\n❌ [FAIL-FAST] CẤU HÌNH PRODUCTION KHÔNG AN TOÀN:');
+    problems.forEach((m) => console.error(` • ${m}`));
+    process.exit(1);
+  }
+} else if (!data.JWT_SECRET || data.JWT_SECRET.length < 16) {
+  console.warn('⚠️  JWT_SECRET chưa đặt hoặc quá ngắn: đang dùng khóa tạm chỉ dành cho máy dev.');
+}
+
+export const env = {
+  ...data,
+  JWT_SECRET:
+    data.JWT_SECRET && data.JWT_SECRET.length >= 16 ? data.JWT_SECRET : DEV_ONLY_JWT_SECRET,
+};
+export type Env = typeof env;

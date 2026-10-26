@@ -47,7 +47,9 @@ services:
       NODE_ENV: production
       PORT: 5000
       DATABASE_URL: postgresql://${POSTGRES_USER:-shopflow_user}:${POSTGRES_PASSWORD:-shopflow_password}@postgres:5432/${POSTGRES_DB:-shopflow_db}?schema=public
-      JWT_SECRET: ${JWT_SECRET:-shopflow_super_secret_jwt_key_2026_change_in_production_min32chars}
+      JWT_SECRET: ${JWT_SECRET:?Hay dat JWT_SECRET (>= 32 ky tu) trong file .env}
+      DEMO_MODE: "false"
+      TRUST_PROXY: "1"
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       AI_PROVIDER: ${AI_PROVIDER:-mock}

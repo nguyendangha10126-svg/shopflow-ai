@@ -19,7 +19,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string, user: User) => void;
+  login: (token: string, user: User, refreshToken?: string) => void;
   logout: () => void;
 }
 
@@ -56,8 +56,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
+  // Khi phiên hết hạn hoàn toàn (refresh token cũng hỏng) -> đưa người dùng về trạng thái đăng xuất
+  useEffect(() => {
+    const onExpired = () => {
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener('sf:auth-expired', onExpired);
+    return () => window.removeEventListener('sf:auth-expired', onExpired);
+  }, []);
+
+  const login = (newToken: string, newUser: User, refreshToken?: string) => {
     localStorage.setItem('sf_token', newToken);
+    if (refreshToken) localStorage.setItem('sf_refresh', refreshToken);
     localStorage.setItem('sf_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
@@ -65,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem('sf_token');
+    localStorage.removeItem('sf_refresh');
     localStorage.removeItem('sf_user');
     setToken(null);
     setUser(null);

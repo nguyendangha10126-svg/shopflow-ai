@@ -1,3 +1,22 @@
+# KNOWN_ISSUES (cập nhật sau đợt sửa lỗi)
+
+## Đã sửa
+- Đăng nhập: không còn "đăng nhập thành công" khi DB lỗi. Tài khoản demo chỉ hoạt động khi `DEMO_MODE=true` và DB offline.
+- Dữ liệu giả: Dashboard/Đơn/Khách/Sản phẩm/FAQ không còn tự trả số giả khi DB lỗi. Mặc định trả 503 và giao diện hiện nút "Thử lại".
+- `JWT_SECRET`: không còn giá trị mặc định công khai; production bắt buộc đặt (>= 32 ký tự) và cấm `DEMO_MODE`.
+- Tổng chi tiêu/số đơn của khách: tính từ đơn thật (đã chốt, đang giao, hoàn thành).
+- Dashboard: gom doanh thu theo giờ Việt Nam; thêm số đơn hủy/trả để tổng khớp; tên model lấy từ cấu hình.
+- Token hết hạn sau 15 phút: frontend tự làm mới bằng refresh token (nguyên nhân thường gặp của lỗi "Không thể tải danh sách...").
+- FAQ: lỗi tải hiện ngay tại chỗ kèm nút Thử lại; lỗi thiếu bảng báo `DB_NOT_MIGRATED`.
+
+## Còn tồn tại / cần làm tiếp
+- Dọn bộ mã cũ ở thư mục gốc (`src/`, `public/`), chỉ giữ `apps/`.
+- Upload ảnh: chuyển sang multipart + re-encode (sharp) và xóa EXIF.
+- Tên model Gemini mặc định cần kiểm tra lại trên Google AI Studio.
+- Chưa chạy lại bộ test sau khi sửa (xem APPLY.md).
+
+---
+
 # DANH SÁCH VẤN ĐỀ THEO DÕI (KNOWN_ISSUES.md)
 
 **Dự án**: ShopFlow AI (Nâng cấp thương mại U0 - U14)  

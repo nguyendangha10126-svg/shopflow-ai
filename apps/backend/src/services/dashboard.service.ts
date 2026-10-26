@@ -2,6 +2,33 @@ import { OrderStatus, OrderSource } from '@prisma/client';
 import { prisma } from '../db';
 import { logger } from '../core/logger';
 import { env } from '../config/env';
+import { shouldUseDemoFallback } from '../core/db-fallback';
+
+const VN_TZ = 'Asia/Ho_Chi_Minh';
+
+/** Trả về 'YYYY-MM-DD' của một thời điểm theo GIỜ VIỆT NAM (không phụ thuộc múi giờ máy chủ). */
+function vnDateKey(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: VN_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+/** Danh sách 7 ngày gần nhất (cũ -> mới) theo giờ Việt Nam, kèm nhãn 'd/m'. */
+function last7VnDays(): Array<{ key: string; label: string }> {
+  const [y, m, d] = vnDateKey(new Date()).split('-').map(Number);
+  const out: Array<{ key: string; label: string }> = [];
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date(Date.UTC(y, m - 1, d - i));
+    out.push({
+      key: dt.toISOString().slice(0, 10),
+      label: `${dt.getUTCDate()}/${dt.getUTCMonth() + 1}`,
+    });
+  }
+  return out;
+}
 
 export interface DashboardSummary {
   kpis: {
@@ -47,9 +74,6 @@ export class DashboardService {
     try {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-      sevenDaysAgo.setHours(0, 0, 0, 0);
 
       // 1. Truy vấn đồng thời các bảng thống kê với index shop_id
       const [
@@ -164,18 +188,15 @@ export class DashboardService {
 
       // 3. Tính toán Biểu đồ 7 ngày gần nhất (Time Series)
       const dailyMap = new Map<string, { revenue: number; count: number; label: string }>();
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(sevenDaysAgo);
-        d.setDate(d.getDate() + i);
-        const key = d.toISOString().split('T')[0];
-        const label = `${d.getDate()}/${d.getMonth() + 1}`;
-        dailyMap.set(key, { revenue: 0, count: 0, label });
+      for (const day of last7VnDays()) {
+        dailyMap.set(day.key, { revenue: 0, count: 0, label: day.label });
       }
 
       orders.forEach((o) => {
-        const orderDate = new Date(o.created_at).toISOString().split('T')[0];
-        if (dailyMap.has(orderDate)) {
-          const entry = dailyMap.get(orderDate)!;
+        // Gom theo NGÀY GIỜ VIỆT NAM để đơn lúc 00:30 sáng không bị tính sang ngày hôm trước
+        const orderDate = vnDateKey(new Date(o.created_at));
+        const entry = dailyMap.get(orderDate);
+        if (entry) {
           entry.count++;
           if (
             o.status === OrderStatus.CONFIRMED ||
@@ -242,7 +263,7 @@ export class DashboardService {
         orders_by_source,
         revenue_trend_7d,
         ai_usage: {
-          model_name: env.GEMINI_MODEL ? `Google ${env.GEMINI_MODEL}` : 'Google Gemini 1.5 Flash',
+          model_name: env.AI_PROVIDER === 'gemini' ? env.GEMINI_MODEL : 'Chế độ mô phỏng (mock)',
           used_this_month,
           monthly_limit,
           remaining,
@@ -256,9 +277,13 @@ export class DashboardService {
         },
       };
     } catch (err: any) {
-      logger.warn({ error: err.message }, 'Lỗi khi tổng hợp báo cáo Dashboard - Trả về dữ liệu mẫu an toàn');
-      // Trả về dữ liệu mô phỏng an toàn nếu CSDL offline
-      return this.getMockSummary();
+      // Chỉ trả dữ liệu mẫu khi DEMO_MODE=true và DB thật sự offline.
+      // Ngược lại ném lỗi để API trả 503 và giao diện hiện nút "Thử tải lại" (không hiện số giả).
+      if (shouldUseDemoFallback(err)) {
+        logger.warn({ error: err.message }, 'DEMO_MODE: DB offline - trả dữ liệu Dashboard mẫu');
+        return this.getMockSummary();
+      }
+      throw err;
     }
   }
 

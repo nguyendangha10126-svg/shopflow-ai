@@ -41,7 +41,7 @@ export const LoginPage: React.FC = () => {
         password: 'ShopFlow@123',
       });
 
-      login(response.data.tokens.access_token, response.data.user);
+      login(response.data.tokens.access_token, response.data.user, response.data.tokens.refresh_token);
       showToast({
         type: 'success',
         message: `Đăng nhập thành công! Chào mừng ${response.data.user.full_name}`,
@@ -69,7 +69,7 @@ export const LoginPage: React.FC = () => {
         password,
       });
 
-      login(response.data.tokens.access_token, response.data.user);
+      login(response.data.tokens.access_token, response.data.user, response.data.tokens.refresh_token);
       showToast({
         type: 'success',
         message: `Đăng nhập thành công! Chào mừng ${response.data.user.full_name}`,

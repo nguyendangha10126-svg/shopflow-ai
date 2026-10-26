@@ -34,7 +34,7 @@ export const RegisterPage: React.FC = () => {
         password,
       });
 
-      login(response.data.tokens.access_token, response.data.user);
+      login(response.data.tokens.access_token, response.data.user, response.data.tokens.refresh_token);
       showToast({
         type: 'success',
         message: 'Tạo cửa hàng thành công! Chào mừng bạn gia nhập ShopFlow AI.',

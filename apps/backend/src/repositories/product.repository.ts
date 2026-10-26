@@ -7,6 +7,7 @@ import {
   ProductQueryDto,
 } from '../api/validators/product.validator';
 import { NotFoundError, ConflictError } from '../core/errors/app-error';
+import { shouldUseDemoFallback } from '../core/db-fallback';
 
 // In-memory fallback dataset cho chế độ offline/dev
 export const mockProductsList: Array<any> = [
@@ -256,10 +257,7 @@ export class ProductRepository {
         },
       };
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         let filtered = mockProductsList.filter((p) => !p.deleted_at);
 
         if (search) {
@@ -314,10 +312,7 @@ export class ProductRepository {
 
       return product;
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const p = mockProductsList.find((item) => item.id === productId && !item.deleted_at);
         if (!p) {
           throw new NotFoundError('Không tìm thấy sản phẩm hoặc sản phẩm đã bị xóa');
@@ -382,10 +377,7 @@ export class ProductRepository {
         };
       });
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         // In-memory fallback
         const newId = `prod-${Date.now()}`;
         const newProduct = {
@@ -441,10 +433,7 @@ export class ProductRepository {
         },
       });
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const p = mockProductsList.find((item) => item.id === productId);
         if (!p) throw new NotFoundError('Không tìm thấy sản phẩm');
         if (dto.name !== undefined) p.name = dto.name;
@@ -483,10 +472,7 @@ export class ProductRepository {
         });
       });
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const p = mockProductsList.find((item) => item.id === productId);
         if (!p) throw new NotFoundError('Không tìm thấy sản phẩm');
         p.deleted_at = new Date();
@@ -524,10 +510,7 @@ export class ProductRepository {
         });
       });
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const p = mockProductsList.find((item) => item.id === productId);
         if (p) {
           p.deleted_at = null;
@@ -570,10 +553,7 @@ export class ProductRepository {
         },
       });
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         for (const p of mockProductsList) {
           const v = p.variants.find((item: any) => item.id === variantId && !item.deleted_at);
           if (v) {

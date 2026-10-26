@@ -3,6 +3,7 @@ import { prisma } from '../db';
 import { OrderQueryDto } from '../api/validators/order.validator';
 import { NotFoundError, ConflictError } from '../core/errors/app-error';
 import { OrderStateMachine } from '../core/domain/order-state-machine';
+import { shouldUseDemoFallback } from '../core/db-fallback';
 
 export interface PreparedOrderItem {
   product_variant_id: string;
@@ -78,10 +79,7 @@ export class OrderRepository {
         },
       };
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const allMockOrders = [
           {
             id: 'ord-1001',
@@ -367,10 +365,7 @@ export class OrderRepository {
 
       return order;
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const result = await this.findMany(shopId, { page: 1, limit: 100 });
         const found = result.items.find(
           (o: any) => o.id === orderId || String(o.order_number) === orderId
@@ -579,6 +574,23 @@ export class OrderRepository {
         );
       }
 
+      // "Giành quyền" xác nhận đơn một cách nguyên tử: nếu có 2 yêu cầu bấm Chốt cùng lúc,
+      // chỉ 1 yêu cầu cập nhật được (count = 1), yêu cầu còn lại bị từ chối -> không trừ kho 2 lần.
+      const claimed = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          shop_id: shopId,
+          status: { in: [OrderStatus.DRAFT, OrderStatus.PENDING_REVIEW] },
+        },
+        data: { status: OrderStatus.CONFIRMED },
+      });
+      if (claimed.count === 0) {
+        throw new ConflictError(
+          'Đơn hàng vừa được xử lý ở nơi khác. Vui lòng tải lại danh sách đơn',
+          'ORDER_ALREADY_PROCESSED'
+        );
+      }
+
       // Trừ kho có điều kiện từng món hàng
       for (const item of order.items) {
         const updated = await tx.$executeRaw`
@@ -639,6 +651,22 @@ export class OrderRepository {
 
       if (order.status === OrderStatus.CANCELLED) {
         throw new ConflictError('Đơn hàng đã bị hủy trước đó', 'ORDER_ALREADY_CANCELLED');
+      }
+
+      // Đơn đã giao/đã trả không được hủy (nếu hủy sẽ cộng kho sai). Phải theo đúng quy trình trạng thái.
+      OrderStateMachine.validateTransition(order.status, OrderStatus.CANCELLED);
+
+      // Giành quyền hủy một cách nguyên tử, chỉ khi trạng thái vẫn đúng như vừa đọc
+      // -> không hoàn kho 2 lần khi bấm Hủy hai lần, không hoàn sai khi trạng thái vừa đổi.
+      const claimed = await tx.order.updateMany({
+        where: { id: orderId, shop_id: shopId, status: order.status },
+        data: { status: OrderStatus.CANCELLED },
+      });
+      if (claimed.count === 0) {
+        throw new ConflictError(
+          'Trạng thái đơn hàng vừa thay đổi. Vui lòng tải lại rồi thử lại',
+          'ORDER_STATUS_CHANGED'
+        );
       }
 
       // Nếu đơn đang ở trạng thái đã trừ kho (CONFIRMED, SHIPPING) -> Hoàn trả tồn kho

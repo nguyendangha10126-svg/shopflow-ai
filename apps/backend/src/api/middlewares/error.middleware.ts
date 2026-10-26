@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../../core/errors/app-error';
 import { logger } from '../../core/logger';
 import { env } from '../../config/env';
+import { isDbConnectionError, isDbSchemaError } from '../../core/db-fallback';
 
 export const errorHandler = (
   err: Error,
@@ -33,7 +34,19 @@ export const errorHandler = (
     // Lỗi kích thước body vượt quá giới hạn
     statusCode = 413;
     code = 'PAYLOAD_TOO_LARGE';
-    message = 'Kích thước dữ liệu gửi lên vượt quá giới hạn cho phép (1MB)';
+    message = 'Kích thước dữ liệu gửi lên vượt quá giới hạn cho phép';
+  } else if (isDbConnectionError(err)) {
+    // DB không kết nối được: báo 503 rõ ràng, KHÔNG trả dữ liệu giả
+    statusCode = 503;
+    code = 'DB_UNAVAILABLE';
+    message = 'Không kết nối được cơ sở dữ liệu. Vui lòng kiểm tra PostgreSQL đang chạy rồi thử lại';
+    logger.error({ err, url: req.originalUrl }, '🔌 [DB] Không kết nối được PostgreSQL');
+  } else if (isDbSchemaError(err)) {
+    // Thiếu bảng/cột: thường do chưa chạy migration
+    statusCode = 503;
+    code = 'DB_NOT_MIGRATED';
+    message = 'Cơ sở dữ liệu chưa được cập nhật cấu trúc. Hãy chạy: npm run prisma:deploy';
+    logger.error({ err, url: req.originalUrl }, '🗄️ [DB] Thiếu bảng/cột - chưa migrate');
   } else {
     // Lỗi hệ thống chưa được kiểm soát
     logger.error(

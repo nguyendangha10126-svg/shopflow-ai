@@ -4,6 +4,7 @@ import { NotFoundError } from '../core/errors/app-error';
 import { CreateFaqDocumentDto, UpdateFaqDocumentDto } from '../api/validators/faq.validator';
 import { AIService } from './ai.service';
 import { env } from '../config/env';
+import { shouldUseDemoFallback } from '../core/db-fallback';
 
 export interface RelevantChunkResult {
   document_id: string;
@@ -174,10 +175,7 @@ export class FaqService {
         return doc;
       });
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const newDoc = {
           id: `faq-doc-${Date.now()}`,
           shop_id: shopId,
@@ -217,10 +215,7 @@ export class FaqService {
         orderBy: { created_at: 'desc' },
       });
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         return this.demoDocuments;
       }
       throw err;
@@ -250,10 +245,7 @@ export class FaqService {
 
       return doc;
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const doc = this.demoDocuments.find((d) => d.id === id);
         if (!doc) throw new NotFoundError('Không tìm thấy tài liệu chính sách');
         return doc;
@@ -309,10 +301,7 @@ export class FaqService {
         return updated;
       });
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const idx = this.demoDocuments.findIndex((d) => d.id === id);
         if (idx === -1) throw new NotFoundError('Không tìm thấy tài liệu để cập nhật');
         const existing = this.demoDocuments[idx];
@@ -356,10 +345,7 @@ export class FaqService {
 
       return { success: true };
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         this.demoDocuments = this.demoDocuments.filter((d) => d.id !== id);
         return { success: true };
       }
@@ -428,7 +414,8 @@ export class FaqService {
         .sort((a, b) => b.relevance_score - a.relevance_score)
         .slice(0, topK);
     } catch (err: any) {
-      logger.warn({ error: err.message }, 'Lỗi khi tìm kiếm FAQ chunks từ CSDL - Dùng fallback bộ nhớ đệm');
+      if (!shouldUseDemoFallback(err)) throw err;
+      logger.warn({ error: err.message }, 'DEMO_MODE: DB offline - tìm FAQ trong dữ liệu mẫu bộ nhớ');
       const fallbackChunks: any[] = [];
       this.demoDocuments.forEach((doc) => {
         if (doc.is_active && doc.chunks) {

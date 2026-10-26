@@ -20,6 +20,12 @@ import testRoutes from './api/routes/test.routes';
 
 const app = express();
 
+// Đứng sau Nginx/Docker: phải tin proxy để req.ip là IP thật của khách (nếu không, mọi người dùng
+// bị tính chung 1 IP và dính rate limit cùng nhau).
+if (env.TRUST_PROXY > 0) {
+  app.set('trust proxy', env.TRUST_PROXY);
+}
+
 // 1. HTTP Security Headers
 app.use(helmet());
 
@@ -64,8 +70,10 @@ app.use(
 );
 
 // 3. Giới hạn kích thước Body (10MB) hỗ trợ tải ảnh an toàn
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Chỉ route upload ảnh được nhận body lớn (ảnh base64). Mọi route khác giới hạn 200KB để chống tấn công làm đầy RAM.
+app.use('/api/v1/upload', express.json({ limit: '8mb' }));
+app.use(express.json({ limit: '200kb' }));
+app.use(express.urlencoded({ extended: true, limit: '200kb' }));
 
 // Phục vụ tệp tĩnh tải lên cục bộ
 app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
@@ -73,13 +81,13 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')
 // 4. Rate Limiting toàn cục
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     error: {
       code: 'TOO_MANY_REQUESTS',
-      message: 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút',
+      message: 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng đợi vài phút rồi thử lại',
     },
   },
 });

@@ -26,8 +26,47 @@ interface RequestOptions extends RequestInit {
 
 const BASE_URL = '/api/v1';
 
+// Access token chỉ sống ~15 phút. Khi hết hạn, tự dùng refresh token để xin token mới (1 lần),
+// rồi gọi lại yêu cầu cũ. Nhờ vậy người dùng không bị "văng" lỗi sau 15 phút.
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem('sf_refresh');
+  if (!refreshToken) return false;
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (!res.ok) return false;
+        const json = await res.json();
+        const tokens = json?.data?.tokens;
+        if (!tokens?.access_token) return false;
+        localStorage.setItem('sf_token', tokens.access_token);
+        if (tokens.refresh_token) localStorage.setItem('sf_refresh', tokens.refresh_token);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+  }
+  return refreshPromise;
+}
+
+function expireSession() {
+  localStorage.removeItem('sf_token');
+  localStorage.removeItem('sf_refresh');
+  localStorage.removeItem('sf_user');
+  window.dispatchEvent(new Event('sf:auth-expired'));
+}
+
 export const apiClient = {
-  async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+  async request<T>(endpoint: string, options: RequestOptions = {}, isRetry = false): Promise<T> {
     const { params, headers, ...restOptions } = options;
 
     let url = `${BASE_URL}${endpoint}`;
@@ -58,10 +97,12 @@ export const apiClient = {
         headers: defaultHeaders,
       });
 
-      // Nếu 401 Unauthorized -> Xóa token hết hạn
-      if (response.status === 401) {
-        localStorage.removeItem('sf_token');
-        localStorage.removeItem('sf_user');
+      // 401: thử làm mới token một lần rồi gọi lại. Không áp dụng cho chính các API đăng nhập/làm mới.
+      if (response.status === 401 && !isRetry && !endpoint.startsWith('/auth/login') && !endpoint.startsWith('/auth/register') && !endpoint.startsWith('/auth/refresh')) {
+        if (await tryRefreshToken()) {
+          return this.request<T>(endpoint, options, true);
+        }
+        expireSession();
       }
 
       const contentType = response.headers.get('content-type');

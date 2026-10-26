@@ -4,6 +4,8 @@ import { prisma } from '../db';
 import { RegisterDto, LoginDto } from '../api/validators/auth.validator';
 import { JwtService, TokenPair } from '../core/auth/jwt.service';
 import { ConflictError, UnauthorizedError, NotFoundError } from '../core/errors/app-error';
+import { env } from '../config/env';
+import { shouldUseDemoFallback } from '../core/db-fallback';
 
 export interface UserResponse {
   id: string;
@@ -19,6 +21,14 @@ export interface AuthResponse {
   user: UserResponse;
   tokens: TokenPair;
 }
+
+// Hằng số cho chế độ DEMO offline (chỉ có tác dụng khi DEMO_MODE=true và DB không kết nối được)
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000001';
+const DEMO_SHOP_ID = '00000000-0000-0000-0000-000000000002';
+const DEMO_EMAIL = 'owner@mayboutique.vn';
+const DEMO_PASSWORD = 'ShopFlow@123';
+// Hash bcrypt giả (sinh lúc khởi động) để thời gian xử lý đồng đều khi email không tồn tại
+const DUMMY_BCRYPT_HASH = bcrypt.hashSync('khong-phai-mat-khau-that', 10);
 
 export class AuthService {
   public static async register(dto: RegisterDto): Promise<AuthResponse> {
@@ -93,10 +103,7 @@ export class AuthService {
       };
     } catch (err: any) {
       if (err instanceof ConflictError) throw err;
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         // Dự phòng Offline / Demo mode khi CSDL chưa bật
         const demoUserId = '00000000-0000-0000-0000-000000000001';
         const demoShopId = '00000000-0000-0000-0000-000000000002';
@@ -124,49 +131,21 @@ export class AuthService {
   }
 
   public static async login(dto: LoginDto): Promise<AuthResponse> {
-    const demoUserId = '00000000-0000-0000-0000-000000000001';
-    const demoShopId = '00000000-0000-0000-0000-000000000002';
-
-    // 0. Hỗ trợ đăng nhập tức thì cho tài khoản Demo May Boutique ngay cả khi DB chưa bật / chưa seed
-    if (dto.email === 'owner@mayboutique.vn' && dto.password === 'ShopFlow@123') {
-      const tokens = JwtService.generateTokens({
-        userId: demoUserId,
-        shopId: demoShopId,
-        role: UserRole.OWNER,
-        email: 'owner@mayboutique.vn',
-      });
-      return {
-        user: {
-          id: demoUserId,
-          shop_id: demoShopId,
-          email: 'owner@mayboutique.vn',
-          full_name: 'May Boutique Owner',
-          role: UserRole.OWNER,
-          is_active: true,
-          created_at: new Date(),
-        },
-        tokens,
-      };
-    }
-
     try {
       // 1. Tìm người dùng theo email
       const user = await prisma.user.findUnique({
         where: { email: dto.email },
       });
 
-      // 2. Chống timing attack: nếu không tìm thấy user vẫn thực hiện một so sánh giả lập
-      if (!user || !user.is_active) {
+      // 2. Chống timing attack: nếu không có user vẫn so sánh với một hash giả
+      const hashToCompare = user?.password_hash ?? DUMMY_BCRYPT_HASH;
+      const isPasswordValid = await bcrypt.compare(dto.password, hashToCompare);
+
+      if (!user || !user.is_active || !isPasswordValid) {
         throw new UnauthorizedError('Email hoặc mật khẩu không chính xác');
       }
 
-      // 3. So khớp mật khẩu với hash trong CSDL
-      const isPasswordValid = await bcrypt.compare(dto.password, user.password_hash);
-      if (!isPasswordValid) {
-        throw new UnauthorizedError('Email hoặc mật khẩu không chính xác');
-      }
-
-      // 4. Cấp cặp Token mới
+      // 3. Cấp cặp Token mới
       const tokens = JwtService.generateTokens({
         userId: user.id,
         shopId: user.shop_id,
@@ -187,28 +166,42 @@ export class AuthService {
         tokens,
       };
     } catch (err: any) {
+      // Chỉ lỗi xác thực mới được trả về như 401. Mọi lỗi khác (DB tắt, lỗi truy vấn...)
+      // KHÔNG BAO GIỜ được phép biến thành "đăng nhập thành công".
       if (err instanceof UnauthorizedError) throw err;
-      
-      // Dự phòng Offline / Demo mode khi CSDL chưa bật hoặc gặp lỗi kết nối
-      const tokens = JwtService.generateTokens({
-        userId: demoUserId,
-        shopId: demoShopId,
-        role: UserRole.OWNER,
-        email: dto.email || 'owner@mayboutique.vn',
-      });
-      return {
-        user: {
-          id: demoUserId,
-          shop_id: demoShopId,
-          email: dto.email || 'owner@mayboutique.vn',
-          full_name: 'May Boutique Owner (Demo)',
-          role: UserRole.OWNER,
-          is_active: true,
-          created_at: new Date(),
-        },
-        tokens,
-      };
+
+      // Chế độ DEMO (chỉ khi DEMO_MODE=true và DB không kết nối được):
+      // cho phép đúng 1 tài khoản demo cố định để trình diễn offline.
+      if (
+        shouldUseDemoFallback(err) &&
+        dto.email === DEMO_EMAIL &&
+        dto.password === DEMO_PASSWORD
+      ) {
+        return AuthService.buildDemoAuth();
+      }
+      throw err;
     }
+  }
+
+  private static buildDemoAuth(): AuthResponse {
+    const tokens = JwtService.generateTokens({
+      userId: DEMO_USER_ID,
+      shopId: DEMO_SHOP_ID,
+      role: UserRole.OWNER,
+      email: DEMO_EMAIL,
+    });
+    return {
+      user: {
+        id: DEMO_USER_ID,
+        shop_id: DEMO_SHOP_ID,
+        email: DEMO_EMAIL,
+        full_name: 'May Boutique Owner (Demo)',
+        role: UserRole.OWNER,
+        is_active: true,
+        created_at: new Date(),
+      },
+      tokens,
+    };
   }
 
   public static async refresh(refreshToken: string): Promise<TokenPair> {
@@ -223,6 +216,7 @@ export class AuthService {
         throw new UnauthorizedError('Tài khoản người dùng không tồn tại hoặc đã bị khóa');
       }
 
+      // Lấy role/shop từ DB (không tin dữ liệu cũ trong token)
       return JwtService.generateTokens({
         userId: user.id,
         shopId: user.shop_id,
@@ -231,12 +225,10 @@ export class AuthService {
       });
     } catch (err: any) {
       if (err instanceof UnauthorizedError) throw err;
-      return JwtService.generateTokens({
-        userId: decoded.userId,
-        shopId: decoded.shopId,
-        role: UserRole.OWNER,
-        email: 'owner@mayboutique.vn',
-      });
+      if (shouldUseDemoFallback(err) && decoded.userId === DEMO_USER_ID) {
+        return AuthService.buildDemoAuth().tokens;
+      }
+      throw err;
     }
   }
 
@@ -266,48 +258,32 @@ export class AuthService {
       });
 
       if (!user) {
-        if (userId === '00000000-0000-0000-0000-000000000001') {
-          return {
-            id: userId,
-            shop_id: '00000000-0000-0000-0000-000000000002',
-            email: 'owner@mayboutique.vn',
-            full_name: 'May Boutique Owner',
-            role: UserRole.OWNER,
-            is_active: true,
-            created_at: new Date(),
-            updated_at: new Date(),
-            shop: {
-              id: '00000000-0000-0000-0000-000000000002',
-              name: 'May Boutique',
-              phone: '0988888888',
-              is_active: true,
-              created_at: new Date(),
-            },
-          };
-        }
         throw new NotFoundError('Không tìm thấy thông tin người dùng');
       }
 
       return user;
     } catch (err: any) {
       if (err instanceof NotFoundError) throw err;
-      return {
-        id: userId,
-        shop_id: '00000000-0000-0000-0000-000000000002',
-        email: 'owner@mayboutique.vn',
-        full_name: 'May Boutique Owner',
-        role: UserRole.OWNER,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-        shop: {
-          id: '00000000-0000-0000-0000-000000000002',
-          name: 'May Boutique',
-          phone: '0988888888',
+      if (shouldUseDemoFallback(err) && userId === DEMO_USER_ID) {
+        return {
+          id: DEMO_USER_ID,
+          shop_id: DEMO_SHOP_ID,
+          email: DEMO_EMAIL,
+          full_name: 'May Boutique Owner (Demo)',
+          role: UserRole.OWNER,
           is_active: true,
           created_at: new Date(),
-        },
-      };
+          updated_at: new Date(),
+          shop: {
+            id: DEMO_SHOP_ID,
+            name: 'May Boutique',
+            phone: '0988888888',
+            is_active: true,
+            created_at: new Date(),
+          },
+        };
+      }
+      throw err;
     }
   }
 }

@@ -24,7 +24,7 @@ export const LandingPage: React.FC = () => {
         email: 'owner@mayboutique.vn',
         password: 'ShopFlow@123',
       });
-      login(response.data.tokens.access_token, response.data.user);
+      login(response.data.tokens.access_token, response.data.user, response.data.tokens.refresh_token);
       showToast('Đã vào chế độ trải nghiệm demo May Boutique!', 'success');
       navigate('/');
     } catch {

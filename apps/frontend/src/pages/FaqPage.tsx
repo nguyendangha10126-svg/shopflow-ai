@@ -71,6 +71,7 @@ export const FaqPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'DOCUMENTS' | 'ASK_AI'>('DOCUMENTS');
   const [documents, setDocuments] = useState<FaqDocumentItem[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+  const [docsError, setDocsError] = useState<string | null>(null);
 
   // Modal Thêm / Sửa tài liệu
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -91,11 +92,15 @@ export const FaqPage: React.FC = () => {
   // 1. Tải danh sách tài liệu
   const fetchDocuments = useCallback(async () => {
     setIsLoadingDocs(true);
+    setDocsError(null);
     try {
       const response = await apiClient.get<{ data: FaqDocumentItem[] }>('/faq/documents');
       setDocuments(response.data);
-    } catch {
-      showToast('Không thể tải danh sách tài liệu chính sách', 'error');
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
+      const msg = err?.message || 'Không thể tải danh sách tài liệu chính sách';
+      setDocsError(msg);
+      showToast(msg, 'error');
     } finally {
       setIsLoadingDocs(false);
     }
@@ -346,6 +351,23 @@ export const FaqPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Skeleton className="h-40 w-full rounded-xl" />
               <Skeleton className="h-40 w-full rounded-xl" />
+            </div>
+          ) : docsError ? (
+            <div
+              role="alert"
+              className="flex flex-col items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-8 text-center dark:border-rose-900 dark:bg-rose-950/30"
+            >
+              <AlertTriangle className="h-8 w-8 text-rose-500" />
+              <div>
+                <p className="font-semibold text-rose-700 dark:text-rose-300">
+                  Chưa tải được danh sách chính sách
+                </p>
+                <p className="mt-1 text-sm text-rose-600 dark:text-rose-400">{docsError}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={fetchDocuments}>
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                Thử lại
+              </Button>
             </div>
           ) : documents.length === 0 ? (
             <EmptyState

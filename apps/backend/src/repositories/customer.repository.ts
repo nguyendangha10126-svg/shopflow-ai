@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, OrderStatus } from '@prisma/client';
 import { prisma } from '../db';
 import {
   CreateCustomerDto,
@@ -6,6 +6,7 @@ import {
   CustomerQueryDto,
 } from '../api/validators/customer.validator';
 import { NotFoundError, ConflictError } from '../core/errors/app-error';
+import { shouldUseDemoFallback } from '../core/db-fallback';
 
 export class CustomerRepository {
   private static serializeCustomer(c: any) {
@@ -13,6 +14,39 @@ export class CustomerRepository {
       ...c,
       total_spent_vnd: Number(c.total_spent_vnd ?? 0),
     };
+  }
+
+
+  /**
+   * Gắn số đơn đã mua và tổng chi tiêu TÍNH TRỰC TIẾP TỪ BẢNG ĐƠN HÀNG.
+   * (Hai cột total_orders / total_spent_vnd trong bảng customers không được cập nhật ở đâu cả,
+   *  nên không dùng. Tính từ đơn thật luôn khớp với trang Đơn hàng.)
+   * Quy ước: chỉ tính đơn ĐÃ CHỐT trở đi (xác nhận / đang giao / hoàn thành).
+   */
+  private static async attachOrderStats(shopId: string, customers: any[]) {
+    if (customers.length === 0) return customers;
+    const ids = customers.map((c) => c.id);
+    const grouped = await prisma.order.groupBy({
+      by: ['customer_id'],
+      where: {
+        shop_id: shopId,
+        customer_id: { in: ids },
+        deleted_at: null,
+        status: { in: [OrderStatus.CONFIRMED, OrderStatus.SHIPPING, OrderStatus.DELIVERED] },
+      },
+      _count: { _all: true },
+      _sum: { total_vnd: true },
+    });
+    const byCustomer = new Map(
+      grouped.map((g) => [
+        g.customer_id as string,
+        { orders: g._count._all, spent: g._sum.total_vnd ?? 0 },
+      ])
+    );
+    return customers.map((c) => {
+      const st = byCustomer.get(c.id);
+      return { ...c, total_orders: st?.orders ?? 0, total_spent_vnd: st?.spent ?? 0 };
+    });
   }
 
   public static async findMany(shopId: string, query: CustomerQueryDto) {
@@ -43,8 +77,9 @@ export class CustomerRepository {
         prisma.customer.count({ where }),
       ]);
 
+      const withStats = await this.attachOrderStats(shopId, items);
       return {
-        items: items.map(this.serializeCustomer),
+        items: withStats.map(this.serializeCustomer),
         pagination: {
           page,
           limit,
@@ -53,10 +88,7 @@ export class CustomerRepository {
         },
       };
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const allMockCustomers = [
           {
             id: 'cust-001',
@@ -160,12 +192,10 @@ export class CustomerRepository {
         throw new NotFoundError('Không tìm thấy khách hàng hoặc khách hàng đã bị xóa');
       }
 
-      return this.serializeCustomer(customer);
+      const [withStats] = await this.attachOrderStats(shopId, [customer]);
+      return this.serializeCustomer(withStats);
     } catch (err: any) {
-      if (
-        err.message?.includes("Can't reach database server") ||
-        err.name === 'PrismaClientInitializationError'
-      ) {
+      if (shouldUseDemoFallback(err)) {
         const result = await this.findMany(shopId, { page: 1, limit: 100 });
         const found = result.items.find((c: any) => c.id === customerId);
         if (!found) throw new NotFoundError('Không tìm thấy khách hàng hoặc khách hàng đã bị xóa');

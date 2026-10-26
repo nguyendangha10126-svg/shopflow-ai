@@ -68,6 +68,7 @@ router.post(
  */
 router.post(
   '/faq-query',
+  aiDraftRateLimiter,
   validate({ body: faqQueryRequestSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

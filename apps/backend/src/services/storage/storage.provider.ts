@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { BadRequestError } from '../../core/errors/app-error';
 
 export interface UploadResult {
@@ -10,7 +11,7 @@ export interface UploadResult {
 }
 
 export interface StorageProvider {
-  upload(fileBuffer: Buffer, fileName: string, mimeType: string): Promise<UploadResult>;
+  upload(fileBuffer: Buffer, fileName: string, mimeType: string, shopId?: string): Promise<UploadResult>;
   delete(publicId: string): Promise<boolean>;
 }
 
@@ -31,17 +32,23 @@ export class LocalStorageProvider implements StorageProvider {
   public async upload(
     fileBuffer: Buffer,
     fileName: string,
-    mimeType: string
+    mimeType: string,
+    shopId?: string
   ): Promise<UploadResult> {
     const ext = mimeType.split('/')[1] || 'jpg';
-    const uniqueId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const uniqueId = `img_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
     const safeName = `${uniqueId}.${ext}`;
-    const targetPath = path.join(this.uploadDir, safeName);
+    // Lưu theo thư mục của từng shop. Chỉ nhận UUID để chống ghi ra ngoài thư mục (path traversal)
+    const shopFolder =
+      shopId && /^[0-9a-fA-F-]{36}$/.test(shopId) ? shopId : 'shared';
+    const targetDir = path.join(this.uploadDir, shopFolder);
+    const targetPath = path.join(targetDir, safeName);
 
     try {
+      await fs.promises.mkdir(targetDir, { recursive: true });
       await fs.promises.writeFile(targetPath, fileBuffer);
       return {
-        url: `/uploads/${safeName}`,
+        url: `/uploads/${shopFolder}/${safeName}`,
         publicId: uniqueId,
         format: ext,
         bytes: fileBuffer.length,
@@ -60,11 +67,17 @@ export class LocalStorageProvider implements StorageProvider {
 
   public async delete(publicId: string): Promise<boolean> {
     try {
-      const files = await fs.promises.readdir(this.uploadDir);
-      const match = files.find((f) => f.startsWith(publicId));
-      if (match) {
-        await fs.promises.unlink(path.join(this.uploadDir, match));
-        return true;
+      if (!/^img_[A-Za-z0-9_]+$/.test(publicId)) return false;
+      const folders = await fs.promises.readdir(this.uploadDir, { withFileTypes: true });
+      for (const folder of folders) {
+        if (!folder.isDirectory()) continue;
+        const dir = path.join(this.uploadDir, folder.name);
+        const files = await fs.promises.readdir(dir);
+        const match = files.find((f) => f.startsWith(publicId));
+        if (match) {
+          await fs.promises.unlink(path.join(dir, match));
+          return true;
+        }
       }
     } catch {
       // Ignore
@@ -73,50 +86,9 @@ export class LocalStorageProvider implements StorageProvider {
   }
 }
 
-export class CloudinaryStorageProvider implements StorageProvider {
-  private cloudName: string | undefined;
-  private apiKey: string | undefined;
-
-  constructor() {
-    this.cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-    this.apiKey = process.env.CLOUDINARY_API_KEY;
-  }
-
-  public async upload(
-    fileBuffer: Buffer,
-    fileName: string,
-    mimeType: string
-  ): Promise<UploadResult> {
-    if (!this.cloudName || !this.apiKey) {
-      // Fallback to local storage if credentials are not configured
-      const local = new LocalStorageProvider();
-      return local.upload(fileBuffer, fileName, mimeType);
-    }
-
-    // When configured with Cloudinary credentials, integrate direct upload API
-    const ext = mimeType.split('/')[1] || 'jpg';
-    const publicId = `shopflow_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    return {
-      url: `https://res.cloudinary.com/${this.cloudName}/image/upload/v1/${publicId}.${ext}`,
-      publicId,
-      format: ext,
-      bytes: fileBuffer.length,
-    };
-  }
-
-  public async delete(_publicId: string): Promise<boolean> {
-    return true;
-  }
-}
-
 export function getStorageProvider(): StorageProvider {
-  if (
-    process.env.NODE_ENV === 'production' &&
-    process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY
-  ) {
-    return new CloudinaryStorageProvider();
-  }
+  // Hiện chỉ có lưu trên đĩa của máy chủ. Muốn dùng Cloudinary/S3/R2 cần viết provider thật
+  // (bản cũ chỉ tạo đường link giả, ảnh sẽ không hiển thị được nên đã được gỡ).
   return new LocalStorageProvider();
 }
 

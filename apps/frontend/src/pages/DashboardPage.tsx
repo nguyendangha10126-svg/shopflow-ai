@@ -307,6 +307,14 @@ export const DashboardPage: React.FC = () => {
               <span className="text-indigo-600">{summary.orders_by_status.DELIVERED || 0} xong</span>
               <span>•</span>
               <span className="text-amber-600">{summary.orders_by_status.DRAFT || 0} nháp</span>
+              {((summary.orders_by_status.CANCELLED || 0) + (summary.orders_by_status.RETURNED || 0)) > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-rose-600">
+                    {(summary.orders_by_status.CANCELLED || 0) + (summary.orders_by_status.RETURNED || 0)} hủy/trả
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </Card>
